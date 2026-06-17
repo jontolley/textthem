@@ -27,6 +27,9 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   const app = Fastify(
     opts.fastifyOptions ?? {
       logger: { level: config.isProduction ? 'info' : 'debug' },
+      // Allow extra time for the initial MongoDB connection on cold boot
+      // (Fastify's default plugin timeout is 10s).
+      pluginTimeout: 30_000,
     },
   );
 

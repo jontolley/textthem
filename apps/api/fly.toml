@@ -1,7 +1,7 @@
 # Fly.io configuration for the text-them API.
 # Create the app once with: fly launch --no-deploy --copy-config
 # Set secrets with: fly secrets set MONGODB_URI=... TWILIO_AUTH_TOKEN=... etc.
-app = "text-them-api"
+app = "textthem-api"
 primary_region = "iad"
 
 [build]
@@ -12,7 +12,7 @@ primary_region = "iad"
 [env]
   NODE_ENV = "production"
   PORT = "8080"
-  MONGODB_DB_NAME = "text_them"
+  MONGODB_DB_NAME = "textthem"
 
 [http_service]
   internal_port = 8080

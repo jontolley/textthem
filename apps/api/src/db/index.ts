@@ -47,7 +47,9 @@ export async function ensureIndexes(collections: Collections): Promise<void> {
 }
 
 export async function connectDatabase(uri: string, dbName: string): Promise<Database> {
-  const client = new MongoClient(uri);
+  // Bound server selection so a blocked/unreachable cluster fails with a clear
+  // error instead of hanging the whole boot sequence.
+  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 15_000 });
   await client.connect();
   const db = client.db(dbName);
   const collections = getCollections(db);

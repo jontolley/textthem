@@ -9,7 +9,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
 
   MONGODB_URI: z.string().min(1),
-  MONGODB_DB_NAME: z.string().min(1).default('text_them'),
+  MONGODB_DB_NAME: z.string().min(1).default('textthem'),
 
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
