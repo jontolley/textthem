@@ -100,6 +100,15 @@ describe('processInbound', () => {
     expect(result.reply).toContain(ORG);
   });
 
+  it('includes the support contact in the HELP reply when configured', async () => {
+    const result = await processInbound(
+      { collections: database.collections, orgName: ORG, supportEmail: 'help@example.org' },
+      PHONE,
+      'HELP',
+    );
+    expect(result.reply).toContain('Contact help@example.org.');
+  });
+
   it('returns unknown for unrecognized keyword', async () => {
     const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'NOPE');
     expect(result.action).toBe('unknown');

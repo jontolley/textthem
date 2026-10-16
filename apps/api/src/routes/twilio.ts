@@ -17,6 +17,7 @@ const inboundSchema = z.object({
 export interface TwilioRoutesDeps {
   twilio: TwilioService;
   orgName: string;
+  supportEmail?: string;
   publicBaseUrl: string;
 }
 
@@ -48,7 +49,7 @@ export async function twilioRoutes(
     }
 
     const result = await processInbound(
-      { collections, orgName: deps.orgName },
+      { collections, orgName: deps.orgName, supportEmail: deps.supportEmail },
       parsed.data.From,
       parsed.data.Body,
     );

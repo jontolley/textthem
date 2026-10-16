@@ -13,10 +13,10 @@ export function TermsPage() {
 
       <h2>Program Description</h2>
       <p>
-        The Program is operated by {ORG.name} using the {ORG.platformName} messaging platform. It
-        sends group text messages to subscribers who have opted in. You join a group by texting that
-        group&rsquo;s keyword to {ORG.smsNumber}. Once subscribed, you will receive recurring text
-        messages from that group until you opt out.
+        The Program is operated by {ORG.name} ({ORG.brandName}) using the {ORG.platformName}{' '}
+        messaging platform. It sends group text messages to subscribers who have opted in. You join
+        a group by texting that group&rsquo;s keyword to {ORG.smsNumber}. Once subscribed, you will
+        receive recurring text messages from that group until you opt out.
       </p>
 
       <h2>Consent to Receive Messages</h2>

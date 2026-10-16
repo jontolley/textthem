@@ -10,6 +10,9 @@ export function PrivacyPage() {
         messaging program (the &ldquo;Program&rdquo;). By opting in to the Program, you agree to the
         collection and use of information as described here.
       </p>
+      <p>
+        {ORG.name} is operated by {ORG.brandName}.
+      </p>
 
       <h2>Information We Collect</h2>
       <p>We collect only the information needed to operate the Program, including:</p>
@@ -45,6 +48,12 @@ export function PrivacyPage() {
       <p>We do not use your information for any purpose unrelated to the Program.</p>
 
       <h2>We Do Not Sell or Share Your Mobile Information</h2>
+      <p>
+        <strong>
+          We do not sell or share your SMS opt-in data or personal information with third parties
+          for marketing purposes.
+        </strong>
+      </p>
       <p>
         <strong>
           We do not sell, rent, lease, or share your mobile phone number, SMS opt-in data, or

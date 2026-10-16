@@ -73,6 +73,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   await app.register(twilioRoutes, {
     twilio: opts.twilio,
     orgName: config.ORG_NAME,
+    supportEmail: config.SUPPORT_EMAIL,
     publicBaseUrl: config.PUBLIC_BASE_URL,
   });
 

@@ -26,6 +26,8 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   ORG_NAME: z.string().default('Our Organization'),
+  // Contact address included in HELP replies (carriers require contact info).
+  SUPPORT_EMAIL: z.string().email().default('info@textthem.app'),
 
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_PUBLISHABLE_KEY: z.string().min(1),

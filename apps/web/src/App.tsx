@@ -4,13 +4,15 @@ import { Layout } from './components/Layout';
 import { GroupsPage } from './pages/GroupsPage';
 import { GroupDetailPage } from './pages/GroupDetailPage';
 import { HistoryPage } from './pages/HistoryPage';
+import { JoinPage } from './pages/JoinPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
 
 export default function App() {
   return (
     <Routes>
-      {/* Public legal pages — must be reachable without signing in. */}
+      {/* Public pages — must be reachable without signing in (carrier review). */}
+      <Route path="/join" element={<JoinPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/terms" element={<TermsPage />} />
       {/* Everything else requires authentication. */}

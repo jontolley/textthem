@@ -34,6 +34,8 @@ export interface InboundResult {
 export interface ProcessInboundDeps {
   collections: Collections;
   orgName: string;
+  /** Contact address appended to the HELP reply, if set. */
+  supportEmail?: string;
 }
 
 /**
@@ -46,7 +48,7 @@ export async function processInbound(
   fromNumber: string,
   rawBody: string,
 ): Promise<InboundResult> {
-  const { collections, orgName } = deps;
+  const { collections, orgName, supportEmail } = deps;
   const body = normalizeBody(rawBody);
   const now = new Date();
 
@@ -67,7 +69,7 @@ export async function processInbound(
   if (HELP_KEYWORDS.has(body)) {
     return {
       action: 'help',
-      reply: `${orgName}: Reply with a group keyword to join. Reply STOP to unsubscribe. Msg & data rates may apply.`,
+      reply: `${orgName}: Reply with a group keyword to join. Reply STOP to unsubscribe. Msg & data rates may apply.${supportEmail ? ` Contact ${supportEmail}.` : ''}`,
     };
   }
 

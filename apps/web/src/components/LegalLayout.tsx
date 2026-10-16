@@ -27,6 +27,8 @@ export function LegalLayout({ title, children }: { title: string; children: Reac
         </div>
 
         <footer className="mt-12 border-t pt-6 text-sm text-muted-foreground">
+          <Link to="/join">Join</Link>
+          {' · '}
           <Link to="/privacy">Privacy Policy</Link>
           {' · '}
           <Link to="/terms">Terms of Service</Link>
