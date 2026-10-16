@@ -13,6 +13,8 @@ export const ORG = {
   supportEmail: 'info@textthem.app',
   /** The phone number people text keywords to (display format is fine). */
   smsNumber: '+1 (509) 479-2928',
+  /** The same number in E.164, used for sms: links and the Join page QR code. */
+  smsNumberE164: '+15094792928',
   /** Keyword shown as the example call-to-action on the public Join page. */
   exampleKeyword: 'EQMEMBER',
 } as const;
