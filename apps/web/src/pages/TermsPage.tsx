@@ -13,9 +13,10 @@ export function TermsPage() {
 
       <h2>Program Description</h2>
       <p>
-        The Program sends group text messages to subscribers who have opted in. You join a group by
-        texting that group&rsquo;s keyword to {ORG.smsNumber}. Once subscribed, you will receive
-        recurring text messages from that group until you opt out.
+        The Program is operated by {ORG.name} using the {ORG.platformName} messaging platform. It
+        sends group text messages to subscribers who have opted in. You join a group by texting that
+        group&rsquo;s keyword to {ORG.smsNumber}. Once subscribed, you will receive recurring text
+        messages from that group until you opt out.
       </p>
 
       <h2>Consent to Receive Messages</h2>
@@ -66,10 +67,9 @@ export function TermsPage() {
 
       <h2>Privacy</h2>
       <p>
-        Your use of the Program is also governed by our{' '}
-        <Link to="/privacy">Privacy Policy</Link>, which explains how we collect, use, and protect
-        your information and confirms that we do not sell or share your mobile information with third
-        parties for marketing.
+        Your use of the Program is also governed by our <Link to="/privacy">Privacy Policy</Link>,
+        which explains how we collect, use, and protect your information and confirms that we do not
+        sell or share your mobile information with third parties for marketing.
       </p>
 
       <h2>Changes to These Terms</h2>

@@ -4,7 +4,9 @@
  */
 export const ORG = {
   /** Your program / organization name as recipients know it. */
-  name: 'Text Them',
+  name: 'Opportunity EQ',
+  /** The software platform the program runs on (not the sender). */
+  platformName: 'Text Them',
   /** A monitored support inbox for privacy and program questions. */
   supportEmail: 'info@textthem.app',
   /** The phone number people text keywords to (display format is fine). */
@@ -12,4 +14,4 @@ export const ORG = {
 } as const;
 
 /** Update whenever you change the legal pages. */
-export const LAST_UPDATED = 'June 16, 2026';
+export const LAST_UPDATED = 'October 15, 2026';

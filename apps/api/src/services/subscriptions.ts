@@ -86,7 +86,7 @@ export async function processInbound(
     return {
       action: 'join',
       matchedKeyword: group.keyword,
-      reply: `You've joined ${group.name}. Reply STOP to leave, HELP for help. Msg & data rates may apply.`,
+      reply: `${orgName}: You've joined ${group.name}. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.`,
     };
   }
 

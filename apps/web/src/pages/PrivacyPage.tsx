@@ -6,9 +6,9 @@ export function PrivacyPage() {
     <LegalLayout title="Privacy Policy">
       <p>
         This Privacy Policy explains how {ORG.name} (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or
-        &ldquo;our&rdquo;) collects, uses, and protects information in connection with our SMS
-        text messaging program (the &ldquo;Program&rdquo;). By opting in to the Program, you agree
-        to the collection and use of information as described here.
+        &ldquo;our&rdquo;) collects, uses, and protects information in connection with our SMS text
+        messaging program (the &ldquo;Program&rdquo;). By opting in to the Program, you agree to the
+        collection and use of information as described here.
       </p>
 
       <h2>Information We Collect</h2>
@@ -38,7 +38,9 @@ export function PrivacyPage() {
         <li>Deliver the group text messages you have opted in to receive;</li>
         <li>Process your subscription, opt-in, and opt-out (STOP) requests;</li>
         <li>Respond to your HELP requests and support inquiries;</li>
-        <li>Maintain records of consent and comply with applicable laws and carrier requirements.</li>
+        <li>
+          Maintain records of consent and comply with applicable laws and carrier requirements.
+        </li>
       </ul>
       <p>We do not use your information for any purpose unrelated to the Program.</p>
 
@@ -54,12 +56,12 @@ export function PrivacyPage() {
 
       <h2>Service Providers</h2>
       <p>
-        We use a third-party messaging provider (Twilio) strictly to transmit the text messages you
-        have requested. This provider processes your phone number and message content only as
-        necessary to deliver our messages on our behalf, and is not permitted to use your
-        information for its own purposes. Sharing information with such a provider for the sole
-        purpose of delivering the Program&rsquo;s messages is not a sale or marketing disclosure of
-        your information.
+        {ORG.name} operates the Program using the {ORG.platformName} messaging platform. We use a
+        third-party messaging provider (Twilio) strictly to transmit the text messages you have
+        requested. This provider processes your phone number and message content only as necessary
+        to deliver our messages on our behalf, and is not permitted to use your information for its
+        own purposes. Sharing information with such a provider for the sole purpose of delivering
+        the Program&rsquo;s messages is not a sale or marketing disclosure of your information.
       </p>
 
       <h2>How We Protect Your Information</h2>
