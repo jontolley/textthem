@@ -1,6 +1,7 @@
 import { SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { OrgRoute } from './components/OrgRoute';
 import { GroupsPage } from './pages/GroupsPage';
 import { GroupDetailPage } from './pages/GroupDetailPage';
 import { HistoryPage } from './pages/HistoryPage';
@@ -11,10 +12,31 @@ import { TermsPage } from './pages/TermsPage';
 export default function App() {
   return (
     <Routes>
-      {/* Public pages — must be reachable without signing in (carrier review). */}
-      <Route path="/join" element={<JoinPage />} />
-      <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/terms" element={<TermsPage />} />
+      {/* Public per-org pages — must be reachable without signing in (carrier review). */}
+      <Route
+        path="/:orgSlug/join"
+        element={
+          <OrgRoute>
+            <JoinPage />
+          </OrgRoute>
+        }
+      />
+      <Route
+        path="/:orgSlug/privacy"
+        element={
+          <OrgRoute>
+            <PrivacyPage />
+          </OrgRoute>
+        }
+      />
+      <Route
+        path="/:orgSlug/terms"
+        element={
+          <OrgRoute>
+            <TermsPage />
+          </OrgRoute>
+        }
+      />
       {/* Everything else requires authentication. */}
       <Route path="/*" element={<DashboardApp />} />
     </Routes>
@@ -31,15 +53,6 @@ function DashboardApp() {
             <p className="text-sm text-muted-foreground">Sign in to manage your SMS groups</p>
           </div>
           <SignIn routing="hash" />
-          <footer className="text-sm text-muted-foreground">
-            <Link to="/privacy" className="underline">
-              Privacy Policy
-            </Link>
-            {' · '}
-            <Link to="/terms" className="underline">
-              Terms of Service
-            </Link>
-          </footer>
         </div>
       </SignedOut>
 

@@ -80,9 +80,14 @@ unique on `groups.keyword` and `members.phoneNumber`, unique compound
 
 ### Frontend (`apps/web`)
 React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
-- **Routing splits public vs. authed** (`src/App.tsx`): `/privacy` and `/terms`
-  are rendered outside the Clerk `<SignedIn>` gate so they're reachable without
-  signing in (required for A2P 10DLC / carrier review). Everything else is gated.
+- **Routing splits public vs. authed** (`src/App.tsx`): per-org public pages
+  `/:orgSlug/join`, `/:orgSlug/privacy`, and `/:orgSlug/terms` are rendered
+  outside the Clerk `<SignedIn>` gate so they're reachable without signing in
+  (required for A2P 10DLC / carrier review). Everything else is gated.
+- **Orgs** are defined in `src/config/org.ts` (`ORGS`, keyed by `slug`). Each
+  org's campaign points at its own pages; `OrgRoute` resolves the slug and pages
+  read it via `useOrg()`. Unknown slugs render "not found". Add an org by adding
+  an entry. SMS reply text still uses the API's single `ORG_NAME`.
 - **API access**: `src/lib/api.ts` `createApiClient(getToken)` attaches the Clerk
   JWT to every request; `src/lib/hooks.ts` wraps it in TanStack Query hooks.
 - Vite reads env from the **repo root** (`envDir` in `vite.config.ts`), so the one
@@ -103,7 +108,8 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   via `fly secrets`; non-secret env (`MONGODB_DB_NAME`, `PORT`) is in `fly.toml`.
 - **Web → Cloudflare Pages**: build command `npm run build:web`, output
   `apps/web/dist`, root `/`. `apps/web/public/_redirects` provides SPA fallback so
-  deep links (`/privacy`) resolve. Node pinned via `.nvmrc`.
+  deep links (`/opportunity-eq/privacy`) resolve. Custom domain
+  `textthem.app` (DNS on Cloudflare; registrar IONOS). Node pinned via `.nvmrc`.
 - **DB → MongoDB Atlas**: the Fly app needs the cluster to allow its egress
   (`0.0.0.0/0` on the free tier) and a `readWrite`-on-`textthem` user.
 

@@ -1,17 +1,19 @@
 import { LegalLayout } from '@/components/LegalLayout';
-import { ORG } from '@/config/org';
+import { PLATFORM_NAME } from '@/config/org';
+import { useOrg } from '@/lib/org-context';
 
 export function PrivacyPage() {
+  const org = useOrg();
   return (
     <LegalLayout title="Privacy Policy">
       <p>
-        This Privacy Policy explains how {ORG.name} (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or
+        This Privacy Policy explains how {org.name} (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or
         &ldquo;our&rdquo;) collects, uses, and protects information in connection with our SMS text
         messaging program (the &ldquo;Program&rdquo;). By opting in to the Program, you agree to the
         collection and use of information as described here.
       </p>
       <p>
-        {ORG.name} is operated by {ORG.brandName}.
+        {org.name} is operated by {org.brandName}.
       </p>
 
       <h2>Information We Collect</h2>
@@ -65,7 +67,7 @@ export function PrivacyPage() {
 
       <h2>Service Providers</h2>
       <p>
-        {ORG.name} operates the Program using the {ORG.platformName} messaging platform. We use a
+        {org.name} operates the Program using the {PLATFORM_NAME} messaging platform. We use a
         third-party messaging provider (Twilio) strictly to transmit the text messages you have
         requested. This provider processes your phone number and message content only as necessary
         to deliver our messages on our behalf, and is not permitted to use your information for its
@@ -112,7 +114,7 @@ export function PrivacyPage() {
       <h2>Contact Us</h2>
       <p>
         If you have questions about this Privacy Policy or your information, contact us at{' '}
-        <a href={`mailto:${ORG.supportEmail}`}>{ORG.supportEmail}</a>.
+        <a href={`mailto:${org.supportEmail}`}>{org.supportEmail}</a>.
       </p>
     </LegalLayout>
   );
