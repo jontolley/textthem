@@ -25,6 +25,15 @@ const STATUS_RANK: Record<string, number> = {
 const DELIVERED = new Set(['delivered', 'read']);
 const UNDELIVERED = new Set(['undelivered', 'failed', 'canceled']);
 
+export type DeliveryBucket = 'delivered' | 'undelivered' | 'pending';
+
+/** Which History count a Twilio status falls under. */
+export function deliveryBucket(status: string): DeliveryBucket {
+  if (DELIVERED.has(status)) return 'delivered';
+  if (UNDELIVERED.has(status)) return 'undelivered';
+  return 'pending';
+}
+
 /** Records the sends of a broadcast that Twilio accepted, before their callbacks resolve them. */
 export async function recordSends(
   deliveries: Collection<DeliveryDoc>,
@@ -116,17 +125,12 @@ export async function deliveryStats(
     const id = _id.broadcastId.toHexString();
     const s = stats.get(id) ?? { delivered: 0, undelivered: 0, pending: 0 };
     stats.set(id, s);
-    if (DELIVERED.has(_id.status)) {
-      s.delivered += count;
-    } else if (UNDELIVERED.has(_id.status)) {
-      s.undelivered += count;
-      if (_id.errorCode) {
-        const codes = errorCounts.get(id) ?? new Map<string, number>();
-        codes.set(_id.errorCode, (codes.get(_id.errorCode) ?? 0) + count);
-        errorCounts.set(id, codes);
-      }
-    } else {
-      s.pending += count;
+    const bucket = deliveryBucket(_id.status);
+    s[bucket] += count;
+    if (bucket === 'undelivered' && _id.errorCode) {
+      const codes = errorCounts.get(id) ?? new Map<string, number>();
+      codes.set(_id.errorCode, (codes.get(_id.errorCode) ?? 0) + count);
+      errorCounts.set(id, codes);
     }
   }
 

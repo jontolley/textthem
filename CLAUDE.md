@@ -122,7 +122,10 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
 ## Operational scripts (`apps/api/scripts/`, run with `node --env-file=… --import tsx`)
 `send-test-broadcast.ts` (live SMS test), `check-message-status.ts` (delivery
 status by SID), `check-a2p-status.ts` (10DLC brand/campaign readiness),
-`check-mongo.ts` (validate a connection string + scoped-user access).
+`check-mongo.ts` (validate a connection string + scoped-user access),
+`backfill-deliveries.ts` (record delivery status for broadcasts sent before
+tracking, matched from Twilio's message log; dry run unless `--write`, and
+ambiguous matches are left untracked).
 
 ## Gotchas
 - US A2P 10DLC: outbound SMS from an unregistered number returns Twilio error
