@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import type { FastifyInstance } from 'fastify';
+import { ObjectId } from 'mongodb';
 import { connectDatabase, type Database } from '../db/index.js';
 import { buildApp } from '../app.js';
 import { loadConfig } from '../config.js';
@@ -15,11 +16,18 @@ const fakeTwilio: TwilioService = {
   validateSignature: () => true,
   async sendSms(to, body) {
     sent.push({ to, body });
-    return true;
+    return { to, sid: `SM${new ObjectId().toHexString()}`, status: 'accepted' };
   },
   async sendBulk(recipients, body) {
     recipients.forEach((to) => sent.push({ to, body }));
-    return { accepted: recipients.length, failed: 0 };
+    return {
+      accepted: recipients.map((to) => ({
+        to,
+        sid: `SM${new ObjectId().toHexString()}`,
+        status: 'accepted',
+      })),
+      failed: 0,
+    };
   },
 };
 
@@ -65,6 +73,7 @@ beforeEach(async () => {
     collections.members.deleteMany({}),
     collections.subscriptions.deleteMany({}),
     collections.messages.deleteMany({}),
+    collections.deliveries.deleteMany({}),
   ]);
 });
 

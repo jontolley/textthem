@@ -1,17 +1,27 @@
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import twilio from 'twilio';
 import { processInbound } from '../services/subscriptions.js';
+import { recordStatus } from '../services/deliveries.js';
 import type { TwilioService } from '../services/twilio.js';
 import type { InboundMessageDoc } from '../db/documents.js';
 
 const INBOUND_PATH = '/api/twilio/inbound';
+/** Outbound sends pass this (on PUBLIC_BASE_URL) as their statusCallback. */
+export const STATUS_CALLBACK_PATH = '/api/twilio/status';
 
 // Twilio posts form-encoded fields; we only need a couple.
 const inboundSchema = z.object({
   From: z.string().min(1),
   Body: z.string().default(''),
+});
+
+const statusSchema = z.object({
+  MessageSid: z.string().min(1),
+  MessageStatus: z.string().min(1),
+  // Only sent with failed/undelivered statuses, e.g. "30034".
+  ErrorCode: z.string().optional(),
 });
 
 export interface TwilioRoutesDeps {
@@ -27,23 +37,25 @@ export async function twilioRoutes(
 ): Promise<void> {
   const { collections } = fastify.mongo;
 
-  fastify.post(INBOUND_PATH, async (request, reply) => {
+  /** Checks the request was signed by Twilio for the webhook at `path`. */
+  function hasValidSignature(request: FastifyRequest, path: string): boolean {
     const params = (request.body ?? {}) as Record<string, unknown>;
-    const url = new URL(INBOUND_PATH, deps.publicBaseUrl).toString();
+    const url = new URL(path, deps.publicBaseUrl).toString();
     const signature = request.headers['x-twilio-signature'];
+    return deps.twilio.validateSignature(
+      Array.isArray(signature) ? signature[0] : signature,
+      url,
+      params,
+    );
+  }
 
-    if (
-      !deps.twilio.validateSignature(
-        Array.isArray(signature) ? signature[0] : signature,
-        url,
-        params,
-      )
-    ) {
+  fastify.post(INBOUND_PATH, async (request, reply) => {
+    if (!hasValidSignature(request, INBOUND_PATH)) {
       fastify.log.warn('Rejected inbound SMS: invalid Twilio signature');
       return reply.code(403).send('Invalid signature');
     }
 
-    const parsed = inboundSchema.safeParse(params);
+    const parsed = inboundSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
       return reply.code(400).send('Bad request');
     }
@@ -67,5 +79,29 @@ export async function twilioRoutes(
     const twiml = new twilio.twiml.MessagingResponse();
     twiml.message(result.reply);
     return reply.header('Content-Type', 'text/xml').send(twiml.toString());
+  });
+
+  // Twilio reports each status change of an outbound message here.
+  fastify.post(STATUS_CALLBACK_PATH, async (request, reply) => {
+    if (!hasValidSignature(request, STATUS_CALLBACK_PATH)) {
+      fastify.log.warn('Rejected status callback: invalid Twilio signature');
+      return reply.code(403).send('Invalid signature');
+    }
+
+    const parsed = statusSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send('Bad request');
+    }
+
+    const { MessageSid, MessageStatus, ErrorCode } = parsed.data;
+    const recorded = await recordStatus(collections.deliveries, {
+      sid: MessageSid,
+      status: MessageStatus,
+      errorCode: ErrorCode || undefined,
+    });
+    if (!recorded) {
+      fastify.log.warn({ status: MessageStatus }, 'Ignored unrecognized Twilio message status');
+    }
+    return reply.code(204).send();
   });
 }

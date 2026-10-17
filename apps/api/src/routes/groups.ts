@@ -7,7 +7,7 @@ import type {
   ListGroupMembersResponse,
   GroupMember,
 } from '@text-them/shared';
-import { badRequest, conflict, notFound } from '../errors.js';
+import { badRequest, conflict, isDuplicateKeyError, notFound } from '../errors.js';
 import { serializeGroup } from '../serializers.js';
 import type { GroupDoc } from '../db/documents.js';
 
@@ -149,8 +149,4 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
       return { members: result };
     },
   );
-}
-
-function isDuplicateKeyError(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
 }

@@ -32,7 +32,9 @@ export function GroupDetailPage() {
     e.preventDefault();
     try {
       const res = await broadcast.mutateAsync(body.trim());
-      toast.success(`Sent to ${res.message.acceptedCount} of ${res.message.recipientCount} members`);
+      toast.success(
+        `Queued ${res.message.acceptedCount} of ${res.message.recipientCount} texts. Delivery status shows in History.`,
+      );
       setBody('');
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Failed to send broadcast');

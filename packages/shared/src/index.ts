@@ -51,16 +51,34 @@ export interface GroupMember {
   subscribedAt?: string;
 }
 
+/**
+ * What Twilio's status callbacks have reported for a broadcast's accepted
+ * sends. Acceptance only means Twilio queued a text; carriers can still drop it
+ * (e.g. error 30034 for unregistered A2P 10DLC traffic).
+ */
+export interface DeliveryStats {
+  /** Confirmed delivered to the handset. */
+  delivered: number;
+  /** Ended undelivered or failed after Twilio accepted them. */
+  undelivered: number;
+  /** Accepted but no final status reported yet. */
+  pending: number;
+  /** Most common Twilio error code among undelivered sends (e.g. "30034"). */
+  topErrorCode?: string;
+}
+
 export interface BroadcastMessage {
   id: string;
   groupId: string;
   body: string;
   sentByUserId: string;
   recipientCount: number;
-  /** Number of sends Twilio accepted (queued). */
+  /** Number of sends Twilio accepted (queued). Not proof of delivery. */
   acceptedCount: number;
-  /** Number of sends that failed to enqueue. */
+  /** Number of sends Twilio's API rejected outright. */
   failedCount: number;
+  /** Absent for broadcasts sent before delivery tracking existed. */
+  delivery?: DeliveryStats;
   sentAt: string;
 }
 

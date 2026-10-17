@@ -1,3 +1,4 @@
+import type { BroadcastMessage } from '@text-them/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
@@ -8,6 +9,56 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useGroups, useMessages } from '@/lib/hooks';
+
+/** Delivered vs. undelivered as reported by Twilio's status callbacks. */
+function DeliverySummary({ message: m }: { message: BroadcastMessage }) {
+  const failedToSend = m.failedCount > 0 && (
+    <div className="text-xs text-destructive">{m.failedCount} failed to send</div>
+  );
+
+  // Sent before delivery tracking: all we know is what Twilio accepted.
+  if (!m.delivery) {
+    return (
+      <>
+        <div>
+          {m.acceptedCount}/{m.recipientCount} accepted
+        </div>
+        <div className="text-xs text-muted-foreground">Delivery not tracked</div>
+        {failedToSend}
+      </>
+    );
+  }
+
+  const { delivered, undelivered, pending, topErrorCode } = m.delivery;
+  return (
+    <>
+      <div>
+        {delivered}/{m.recipientCount} delivered
+      </div>
+      {undelivered > 0 && (
+        <div className="text-xs text-destructive">
+          {undelivered} undelivered
+          {topErrorCode && (
+            <>
+              {' · '}
+              <a
+                href={`https://www.twilio.com/docs/api/errors/${topErrorCode}`}
+                target="_blank"
+                rel="noreferrer"
+                title="Most common Twilio error code"
+                className="underline underline-offset-2"
+              >
+                error {topErrorCode}
+              </a>
+            </>
+          )}
+        </div>
+      )}
+      {pending > 0 && <div className="text-xs text-muted-foreground">{pending} pending</div>}
+      {failedToSend}
+    </>
+  );
+}
 
 export function HistoryPage() {
   const { data: messages, isLoading } = useMessages();
@@ -40,7 +91,7 @@ export function HistoryPage() {
                   <TableHead>Sent</TableHead>
                   <TableHead>Group</TableHead>
                   <TableHead>Message</TableHead>
-                  <TableHead className="text-right">Delivered</TableHead>
+                  <TableHead className="text-right">Delivery</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -51,11 +102,8 @@ export function HistoryPage() {
                     </TableCell>
                     <TableCell>{groupName(m.groupId)}</TableCell>
                     <TableCell className="max-w-md truncate">{m.body}</TableCell>
-                    <TableCell className="text-right">
-                      {m.acceptedCount}/{m.recipientCount}
-                      {m.failedCount > 0 && (
-                        <span className="text-destructive"> ({m.failedCount} failed)</span>
-                      )}
+                    <TableCell className="whitespace-nowrap text-right">
+                      <DeliverySummary message={m} />
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,8 +1,23 @@
 import twilio from 'twilio';
 import type { AppConfig } from '../config.js';
 
+export interface SendOptions {
+  /** URL Twilio POSTs this message's delivery status updates to. */
+  statusCallback?: string;
+}
+
+/** A send Twilio's API accepted. Delivery is reported later via status callback. */
+export interface SentMessage {
+  to: string;
+  /** Twilio Message SID (SM…); status callbacks reference it. */
+  sid: string;
+  /** Twilio's status at acceptance, e.g. "accepted" or "queued". */
+  status: string;
+}
+
 export interface SendResult {
-  accepted: number;
+  accepted: SentMessage[];
+  /** Number of sends Twilio's API rejected outright. */
   failed: number;
 }
 
@@ -12,12 +27,12 @@ export interface SendResult {
  * an in-memory stub.
  */
 export interface TwilioService {
-  /** Validates an inbound webhook signature. */
+  /** Validates a Twilio webhook signature (inbound SMS and status callbacks). */
   validateSignature(signature: string | undefined, url: string, params: Record<string, unknown>): boolean;
-  /** Sends a single SMS. Returns true if Twilio accepted (queued) it. */
-  sendSms(to: string, body: string): Promise<boolean>;
+  /** Sends a single SMS. Returns the accepted message, or null if Twilio rejected it. */
+  sendSms(to: string, body: string, options?: SendOptions): Promise<SentMessage | null>;
   /** Sends the same body to many recipients, tolerating individual failures. */
-  sendBulk(recipients: string[], body: string): Promise<SendResult>;
+  sendBulk(recipients: string[], body: string, options?: SendOptions): Promise<SendResult>;
 }
 
 export function createTwilioService(config: AppConfig): TwilioService {
@@ -29,12 +44,21 @@ export function createTwilioService(config: AppConfig): TwilioService {
     ? { messagingServiceSid: config.TWILIO_MESSAGING_SERVICE_SID }
     : { from: config.TWILIO_FROM_NUMBER };
 
-  async function sendSms(to: string, body: string): Promise<boolean> {
+  async function sendSms(
+    to: string,
+    body: string,
+    options: SendOptions = {},
+  ): Promise<SentMessage | null> {
     try {
-      await client.messages.create({ to, body, ...sender });
-      return true;
+      const msg = await client.messages.create({
+        to,
+        body,
+        ...sender,
+        ...(options.statusCallback ? { statusCallback: options.statusCallback } : {}),
+      });
+      return { to, sid: msg.sid, status: msg.status };
     } catch {
-      return false;
+      return null;
     }
   }
 
@@ -47,10 +71,10 @@ export function createTwilioService(config: AppConfig): TwilioService {
 
     sendSms,
 
-    async sendBulk(recipients, body) {
-      const results = await Promise.all(recipients.map((to) => sendSms(to, body)));
-      const accepted = results.filter(Boolean).length;
-      return { accepted, failed: results.length - accepted };
+    async sendBulk(recipients, body, options) {
+      const results = await Promise.all(recipients.map((to) => sendSms(to, body, options)));
+      const accepted = results.filter((r): r is SentMessage => r !== null);
+      return { accepted, failed: results.length - accepted.length };
     },
   };
 }

@@ -5,6 +5,7 @@ import type { BroadcastResponse, ListMessagesResponse } from '@text-them/shared'
 import { badRequest, notFound } from '../errors.js';
 import { serializeMessage } from '../serializers.js';
 import type { MessageDoc } from '../db/documents.js';
+import { deliveryStats, recordSends } from '../services/deliveries.js';
 import type { TwilioService } from '../services/twilio.js';
 
 const broadcastSchema = z.object({
@@ -13,13 +14,15 @@ const broadcastSchema = z.object({
 
 export interface MessageRoutesDeps {
   twilio: TwilioService;
+  /** Absolute URL of the Twilio status-callback route. */
+  statusCallbackUrl: string;
 }
 
 export async function messageRoutes(
   fastify: FastifyInstance,
   deps: MessageRoutesDeps,
 ): Promise<void> {
-  const { groups, subscriptions, members, messages } = fastify.mongo.collections;
+  const { groups, subscriptions, members, messages, deliveries } = fastify.mongo.collections;
 
   fastify.addHook('preHandler', fastify.requireAuth);
 
@@ -41,8 +44,10 @@ export async function messageRoutes(
 
       const { accepted, failed } =
         recipients.length > 0
-          ? await deps.twilio.sendBulk(recipients, body)
-          : { accepted: 0, failed: 0 };
+          ? await deps.twilio.sendBulk(recipients, body, {
+              statusCallback: deps.statusCallbackUrl,
+            })
+          : { accepted: [], failed: 0 };
 
       const doc: MessageDoc = {
         _id: new ObjectId(),
@@ -50,19 +55,22 @@ export async function messageRoutes(
         body,
         sentByUserId: request.userId,
         recipientCount: recipients.length,
-        acceptedCount: accepted,
+        acceptedCount: accepted.length,
         failedCount: failed,
         sentAt: new Date(),
       };
       await messages.insertOne(doc);
+      await recordSends(deliveries, doc._id, accepted);
 
+      const stats = await deliveryStats(deliveries, [doc]);
       reply.code(201);
-      return { message: serializeMessage(doc) };
+      return { message: serializeMessage(doc, stats.get(doc._id.toHexString())) };
     },
   );
 
   fastify.get('/api/messages', async (): Promise<ListMessagesResponse> => {
     const docs = await messages.find().sort({ sentAt: -1 }).limit(200).toArray();
-    return { messages: docs.map(serializeMessage) };
+    const stats = await deliveryStats(deliveries, docs);
+    return { messages: docs.map((d) => serializeMessage(d, stats.get(d._id.toHexString()))) };
   });
 }

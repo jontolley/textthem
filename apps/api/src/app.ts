@@ -7,7 +7,7 @@ import { databasePlugin, type Database } from './db/index.js';
 import { authPlugin, clerkAuthenticator, type Authenticator } from './plugins/auth.js';
 import { groupRoutes } from './routes/groups.js';
 import { messageRoutes } from './routes/messages.js';
-import { twilioRoutes } from './routes/twilio.js';
+import { STATUS_CALLBACK_PATH, twilioRoutes } from './routes/twilio.js';
 import { HttpError } from './errors.js';
 import type { TwilioService } from './services/twilio.js';
 import type { AppConfig } from './config.js';
@@ -86,7 +86,10 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
       });
     }
     await scope.register(groupRoutes);
-    await scope.register(messageRoutes, { twilio: opts.twilio });
+    await scope.register(messageRoutes, {
+      twilio: opts.twilio,
+      statusCallbackUrl: new URL(STATUS_CALLBACK_PATH, config.PUBLIC_BASE_URL).toString(),
+    });
   });
 
   return app;

@@ -16,3 +16,8 @@ export const badRequest = (message: string, details?: unknown) =>
 export const notFound = (message = 'Resource not found') =>
   new HttpError(404, 'not_found', message);
 export const conflict = (message: string) => new HttpError(409, 'conflict', message);
+
+/** True for MongoDB's E11000 duplicate key error (a unique index was violated). */
+export function isDuplicateKeyError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
+}

@@ -59,8 +59,9 @@ stubs (see `src/routes/groups.test.ts`).
   outside it and never touch Clerk. `src/plugins/auth.ts` decorates `requireAuth`
   (throws 401) and `request.userId`. Tests bypass Clerk by passing an
   `authenticator` stub; production uses `clerkAuthenticator` (reads `getAuth`).
-- **Twilio webhook security.** `POST /api/twilio/inbound` is *not* Clerk-protected;
-  it verifies Twilio's signature instead (`TwilioService.validateSignature`). Set
+- **Twilio webhook security.** `POST /api/twilio/inbound` and
+  `POST /api/twilio/status` are *not* Clerk-protected; they verify Twilio's
+  signature instead (`TwilioService.validateSignature`). Set
   `TWILIO_SKIP_SIGNATURE_VALIDATION=true` only for local testing.
 - **Core inbound logic is isolated** in `src/services/subscriptions.ts`
   (`processInbound`): it normalizes the body and dispatches STOP/HELP/keyword →
@@ -69,12 +70,17 @@ stubs (see `src/routes/groups.test.ts`).
 - **Outbound sender is either/or.** `src/services/twilio.ts` uses a Messaging
   Service when `TWILIO_MESSAGING_SERVICE_SID` is set, otherwise `TWILIO_FROM_NUMBER`.
   Config validation requires at least one.
+- **Delivery tracking.** Broadcast sends pass `statusCallback`
+  (`PUBLIC_BASE_URL` + `/api/twilio/status`). `src/services/deliveries.ts` keeps one
+  `deliveries` doc per Message SID; callbacks only move a status forward (they
+  repeat and arrive out of order), and History's delivered/undelivered counts are
+  aggregated from those docs at read time.
 
 ### Data model
 Collections: `groups`, `members`, `subscriptions` (the opt-in audit trail with
-status + timestamps), `messages` (broadcast log), `inbound_messages` (every
-received SMS). Indexes are created on boot in `src/db/index.ts` (`ensureIndexes`):
-unique on `groups.keyword` and `members.phoneNumber`, unique compound
+status + timestamps), `messages` (broadcast log), `deliveries` (per-recipient
+Twilio status of each broadcast send), `inbound_messages` (every received SMS). Indexes are created on boot in `src/db/index.ts` (`ensureIndexes`):
+unique on `groups.keyword`, `members.phoneNumber`, and `deliveries.twilioSid`, unique compound
 `{memberId, groupId}` on subscriptions. The database name is **`textthem`**
 (`MONGODB_DB_NAME`), the same in local and production.
 

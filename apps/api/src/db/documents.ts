@@ -45,6 +45,29 @@ export interface MessageDoc {
   sentAt: Date;
 }
 
+/**
+ * One outbound text of a broadcast, keyed by its Twilio Message SID. Twilio's
+ * status callbacks update `status` until it reaches a final state.
+ */
+export interface DeliveryDoc {
+  _id: ObjectId;
+  /** Twilio Message SID (SM…). Unique. */
+  twilioSid: string;
+  /**
+   * The broadcast (`messages` doc) this send belongs to. Set when the send is
+   * recorded; a status callback can arrive first and create the doc without it.
+   */
+  broadcastId?: ObjectId;
+  /** Recipient, E.164. Set alongside `broadcastId`. */
+  to?: string;
+  /** Latest Twilio message status, e.g. "queued", "delivered", "undelivered". */
+  status: string;
+  /** Twilio error code reported with a failed/undelivered status, e.g. "30034". */
+  errorCode?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface InboundMessageDoc {
   _id: ObjectId;
   fromNumber: string;
@@ -59,5 +82,6 @@ export const COLLECTIONS = {
   members: 'members',
   subscriptions: 'subscriptions',
   messages: 'messages',
+  deliveries: 'deliveries',
   inboundMessages: 'inbound_messages',
 } as const;

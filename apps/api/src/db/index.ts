@@ -6,6 +6,7 @@ import {
   type MemberDoc,
   type SubscriptionDoc,
   type MessageDoc,
+  type DeliveryDoc,
   type InboundMessageDoc,
 } from './documents.js';
 
@@ -14,6 +15,7 @@ export interface Collections {
   members: Collection<MemberDoc>;
   subscriptions: Collection<SubscriptionDoc>;
   messages: Collection<MessageDoc>;
+  deliveries: Collection<DeliveryDoc>;
   inboundMessages: Collection<InboundMessageDoc>;
 }
 
@@ -29,6 +31,7 @@ function getCollections(db: Db): Collections {
     members: db.collection<MemberDoc>(COLLECTIONS.members),
     subscriptions: db.collection<SubscriptionDoc>(COLLECTIONS.subscriptions),
     messages: db.collection<MessageDoc>(COLLECTIONS.messages),
+    deliveries: db.collection<DeliveryDoc>(COLLECTIONS.deliveries),
     inboundMessages: db.collection<InboundMessageDoc>(COLLECTIONS.inboundMessages),
   };
 }
@@ -43,6 +46,8 @@ export async function ensureIndexes(collections: Collections): Promise<void> {
   );
   await collections.subscriptions.createIndex({ groupId: 1, status: 1 });
   await collections.messages.createIndex({ groupId: 1, sentAt: -1 });
+  await collections.deliveries.createIndex({ twilioSid: 1 }, { unique: true });
+  await collections.deliveries.createIndex({ broadcastId: 1 });
   await collections.inboundMessages.createIndex({ receivedAt: -1 });
 }
 
