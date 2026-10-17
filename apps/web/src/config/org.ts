@@ -31,7 +31,7 @@ export const ORGS: readonly OrgConfig[] = [
     slug: 'opportunity-eq',
     name: 'Opportunity EQ',
     brandName: 'Jon Tolley',
-    supportEmail: 'info@textthem.app',
+    supportEmail: 'opportunityeq@textthem.app',
     smsNumber: '+1 (509) 479-2928',
     smsNumberE164: '+15094792928',
     exampleKeyword: 'EQMEMBER',

@@ -23,9 +23,9 @@ export function TermsPage() {
 
       <h2>Consent to Receive Messages</h2>
       <p>
-        By texting a keyword to join, you consent to receive recurring automated marketing and
-        informational text messages from the Program at the mobile number you used to opt in.
-        Consent to receive messages is not a condition of any purchase.
+        By texting a keyword to join, you consent to receive recurring automated text messages from
+        the Program, such as activity reminders, schedule changes, and announcements, at the mobile
+        number you used to opt in. Consent to receive messages is not a condition of any purchase.
       </p>
 
       <h2>Message Frequency</h2>
