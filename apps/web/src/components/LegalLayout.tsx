@@ -1,14 +1,25 @@
 import { MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { orgPath } from '@/config/org';
+import { useDocumentTitle } from '@/lib/document-title';
 import { useOrg } from '@/lib/org-context';
 
 /**
  * Shared chrome + prose styling for the public legal pages. Children should be
  * plain semantic HTML (h2 / p / ul / li / a); this applies the typography.
+ * The browser tab shows `documentTitle`, or the heading followed by the org name.
  */
-export function LegalLayout({ title, children }: { title: string; children: React.ReactNode }) {
+export function LegalLayout({
+  title,
+  documentTitle,
+  children,
+}: {
+  title: string;
+  documentTitle?: string;
+  children: React.ReactNode;
+}) {
   const org = useOrg();
+  useDocumentTitle(documentTitle ?? `${title} · ${org.name}`);
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">

@@ -1,46 +1,17 @@
 import { SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useRoutes } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { OrgRoute } from './components/OrgRoute';
 import { GroupsPage } from './pages/GroupsPage';
 import { GroupDetailPage } from './pages/GroupDetailPage';
 import { HistoryPage } from './pages/HistoryPage';
-import { JoinPage } from './pages/JoinPage';
-import { PrivacyPage } from './pages/PrivacyPage';
-import { TermsPage } from './pages/TermsPage';
+import { publicRoutes } from './routes/public';
 
 export default function App() {
-  return (
-    <Routes>
-      {/* Public per-org pages — must be reachable without signing in (carrier review). */}
-      <Route
-        path="/:orgSlug/join"
-        element={
-          <OrgRoute>
-            <JoinPage />
-          </OrgRoute>
-        }
-      />
-      <Route
-        path="/:orgSlug/privacy"
-        element={
-          <OrgRoute>
-            <PrivacyPage />
-          </OrgRoute>
-        }
-      />
-      <Route
-        path="/:orgSlug/terms"
-        element={
-          <OrgRoute>
-            <TermsPage />
-          </OrgRoute>
-        }
-      />
-      {/* Everything else requires authentication. */}
-      <Route path="/*" element={<DashboardApp />} />
-    </Routes>
-  );
+  return useRoutes([
+    ...publicRoutes,
+    // Everything else requires authentication.
+    { path: '/*', element: <DashboardApp /> },
+  ]);
 }
 
 function DashboardApp() {

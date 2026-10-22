@@ -86,14 +86,23 @@ unique on `groups.keyword`, `members.phoneNumber`, and `deliveries.twilioSid`, u
 
 ### Frontend (`apps/web`)
 React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
-- **Routing splits public vs. authed** (`src/App.tsx`): per-org public pages
-  `/:orgSlug/join`, `/:orgSlug/privacy`, and `/:orgSlug/terms` are rendered
-  outside the Clerk `<SignedIn>` gate so they're reachable without signing in
-  (required for A2P 10DLC / carrier review). Everything else is gated.
+- **Routing splits public vs. authed** (`src/App.tsx`): the per-org public pages
+  in `src/routes/public.tsx` are `/:orgSlug/join` (lists the org's groups),
+  `/:orgSlug/:keyword/join` (one group's call to action), `/:orgSlug/privacy`,
+  and `/:orgSlug/terms`. They're rendered outside the Clerk `<SignedIn>` gate so
+  they're reachable without signing in (required for A2P 10DLC / carrier
+  review). Everything else is gated.
+- **Public pages are prerendered.** `npm run build` (web) also runs
+  `npm run prerender`. That builds `src/prerender.tsx` for SSR and runs
+  `scripts/prerender.js`, which writes each public page to
+  `dist/<path>.html`, so the content and `<title>` show without JavaScript. Page
+  titles come from `useDocumentTitle` (via `LegalLayout`).
 - **Orgs** are defined in `src/config/org.ts` (`ORGS`, keyed by `slug`). Each
   org's campaign points at its own pages; `OrgRoute` resolves the slug and pages
-  read it via `useOrg()`. Unknown slugs render "not found". Add an org by adding
-  an entry. SMS reply text still uses the API's single `ORG_NAME`.
+  read it via `useOrg()`. Unknown slugs and keywords render "not found". An org's
+  `groups` (keyword, name, description) drive its Join pages. Keep them in step
+  with the groups in the dashboard: they're config, not read from the API. Add an
+  org by adding an entry. SMS reply text still uses the API's single `ORG_NAME`.
 - **API access**: `src/lib/api.ts` `createApiClient(getToken)` attaches the Clerk
   JWT to every request; `src/lib/hooks.ts` wraps it in TanStack Query hooks.
 - Vite reads env from the **repo root** (`envDir` in `vite.config.ts`), so the one
@@ -113,8 +122,10 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   Secrets (`MONGODB_URI`, Twilio, Clerk, `CORS_ORIGINS`, `PUBLIC_BASE_URL`) are set
   via `fly secrets`; non-secret env (`MONGODB_DB_NAME`, `PORT`) is in `fly.toml`.
 - **Web → Cloudflare Pages**: build command `npm run build:web`, output
-  `apps/web/dist`, root `/`. `apps/web/public/_redirects` provides SPA fallback so
-  deep links (`/opportunity-eq/privacy`) resolve. Custom domain
+  `apps/web/dist`, root `/`.
+  - Pages serves the prerendered `dist/<path>.html` for `/<path>`.
+  - With no `404.html`, Pages runs in SPA mode and serves `index.html` for every other path, which covers the dashboard routes.
+  - Don't add a `_redirects` catch-all. Cloudflare applies `_redirects` rules even when a file matches, so it would hide the static pages. Custom domain
   `textthem.app` (DNS on Cloudflare; registrar IONOS). Node pinned via `.nvmrc`.
 - **DB → MongoDB Atlas**: the Fly app needs the cluster to allow its egress
   (`0.0.0.0/0` on the free tier) and a `readWrite`-on-`textthem` user.
