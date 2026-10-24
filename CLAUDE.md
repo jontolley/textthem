@@ -128,7 +128,8 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
 
 ### Version info
 The dashboard's Help page (`/help`) shows which commit each side was built
-from, and whether they match.
+from. The two often differ, because the API only redeploys when `apps/api` or
+`packages/shared` change.
 - **Dashboard:** `vite.config.ts` bakes in `__APP_COMMIT__` (Cloudflare's
   `CF_PAGES_COMMIT_SHA`, else `git rev-parse HEAD`) and `__APP_BUILT_AT__`.
   Both are null in the dev server.

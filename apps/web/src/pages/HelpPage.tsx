@@ -42,26 +42,6 @@ function BuildLine({ info, unstamped }: { info: VersionInfo; unstamped: string }
 function VersionsCard() {
   const { data: api, isLoading, isError, refetch, isFetching } = useApiVersion();
 
-  let comparison: { text: string; className: string } | null = null;
-  if (api) {
-    if (!WEB_VERSION.commit || !api.commit) {
-      comparison = {
-        text: "Can't compare: one side is a local build without a commit stamp.",
-        className: 'text-muted-foreground',
-      };
-    } else if (WEB_VERSION.commit === api.commit) {
-      comparison = {
-        text: 'In sync: the dashboard and API are from the same commit.',
-        className: 'text-green-700',
-      };
-    } else {
-      comparison = {
-        text: 'Different commits. If you just pushed, one may still be deploying; otherwise check the deploy logs.',
-        className: 'text-amber-700',
-      };
-    }
-  }
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -70,7 +50,8 @@ function VersionsCard() {
           <RefreshCw className="h-4 w-4" /> Check again
         </Button>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
+      <CardContent className="text-sm">
+        {/* They often differ: the API only redeploys when its own code changes. */}
         <div className="grid grid-cols-[6rem_1fr] gap-y-2">
           <span className="font-medium">Dashboard</span>
           <BuildLine info={WEB_VERSION} unstamped="Development server (not a build)" />
@@ -83,7 +64,6 @@ function VersionsCard() {
             <BuildLine info={api} unstamped="Local build (not stamped with a commit)" />
           )}
         </div>
-        {comparison && <p className={comparison.className}>{comparison.text}</p>}
       </CardContent>
     </Card>
   );
