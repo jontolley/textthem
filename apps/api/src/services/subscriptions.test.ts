@@ -94,6 +94,23 @@ describe('processInbound', () => {
     expect(sub?.unsubscribedAt).toBeUndefined();
   });
 
+  it.each(['START', 'unstop'])('tells a member to text a keyword after %s', async (keyword) => {
+    await seedGroup();
+    await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'DRAGON');
+    await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'STOP');
+
+    const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, keyword);
+    expect(result.action).toBe('start');
+    expect(result.reply).toBe(
+      `${ORG}: You're opted back in. Text a group keyword to join or rejoin a group. Reply HELP for help, STOP to opt out.`,
+    );
+
+    // Opting back in to Twilio doesn't rejoin any group.
+    const member = await database.collections.members.findOne({ phoneNumber: PHONE });
+    const sub = await database.collections.subscriptions.findOne({ memberId: member!._id });
+    expect(sub?.status).toBe('unsubscribed');
+  });
+
   it('returns help text on HELP', async () => {
     const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'HELP');
     expect(result.action).toBe('help');

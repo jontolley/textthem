@@ -11,7 +11,7 @@ export type SubscriptionStatus = 'subscribed' | 'unsubscribed';
 export type SubscriptionSource = 'sms' | 'admin' | 'import';
 
 /** The action taken in response to an inbound SMS. */
-export type InboundAction = 'join' | 'stop' | 'help' | 'unknown';
+export type InboundAction = 'join' | 'stop' | 'start' | 'help' | 'unknown';
 
 export interface Group {
   id: string;

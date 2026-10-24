@@ -3,6 +3,9 @@ import type { InboundAction } from '@text-them/shared';
 import type { Collections } from '../db/index.js';
 
 const STOP_KEYWORDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT']);
+// Twilio's reserved opt-in keywords: they lift Twilio's STOP block, but STOP
+// left the member in no groups, so they still need a group keyword to rejoin.
+const START_KEYWORDS = new Set(['START', 'UNSTOP']);
 const HELP_KEYWORDS = new Set(['HELP', 'INFO']);
 
 export function normalizeBody(body: string): string {
@@ -40,8 +43,8 @@ export interface ProcessInboundDeps {
 
 /**
  * Applies an inbound SMS to subscription state and returns the reply.
- * Order matters: STOP and HELP are checked before group keywords so they always
- * win (carrier compliance).
+ * Order matters: STOP, START, and HELP are checked before group keywords so
+ * they always win (carrier compliance).
  */
 export async function processInbound(
   deps: ProcessInboundDeps,
@@ -63,6 +66,13 @@ export async function processInbound(
     return {
       action: 'stop',
       reply: `You have been unsubscribed from all ${orgName} messages and will receive no further texts. Reply HELP for help.`,
+    };
+  }
+
+  if (START_KEYWORDS.has(body)) {
+    return {
+      action: 'start',
+      reply: `${orgName}: You're opted back in. Text a group keyword to join or rejoin a group. Reply HELP for help, STOP to opt out.`,
     };
   }
 
