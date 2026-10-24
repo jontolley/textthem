@@ -9,10 +9,22 @@ import { HttpError } from '../errors.js';
  */
 export type Authenticator = (request: FastifyRequest) => Promise<string | null> | string | null;
 
-export const clerkAuthenticator: Authenticator = (request) => {
-  const { userId } = getAuth(request);
-  return userId ?? null;
-};
+/**
+ * Clerk-backed authenticator. Only accepts session tokens minted for one of
+ * `authorizedParties` (the dashboard's origins): Clerk's `azp` claim names the
+ * origin that requested the token, so a token issued to another site on the
+ * same Clerk instance can't be replayed here. Clerk recommends this for
+ * production; tokens without `azp` are judged the same way Clerk does (allowed).
+ */
+export function clerkAuthenticator(authorizedParties: string[]): Authenticator {
+  return (request) => {
+    const { userId, sessionClaims } = getAuth(request);
+    if (!userId) return null;
+    const azp = sessionClaims?.azp;
+    if (typeof azp === 'string' && !authorizedParties.includes(azp)) return null;
+    return userId;
+  };
+}
 
 declare module 'fastify' {
   interface FastifyRequest {

@@ -72,7 +72,8 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   // A custom authenticator (tests) bypasses Clerk entirely.
   const usingClerk = !opts.authenticator;
   await app.register(authPlugin, {
-    authenticator: opts.authenticator ?? clerkAuthenticator,
+    // The dashboard's origins are exactly the CORS origins.
+    authenticator: opts.authenticator ?? clerkAuthenticator(config.corsOrigins),
   });
 
   // ─── Public routes (no Clerk) ───────────────────────────────────────

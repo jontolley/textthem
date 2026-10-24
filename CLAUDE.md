@@ -58,7 +58,9 @@ stubs (see `src/routes/groups.test.ts`).
   `messageRoutes`). Public routes — `/health` and the Twilio webhook — live
   outside it and never touch Clerk. `src/plugins/auth.ts` decorates `requireAuth`
   (throws 401) and `request.userId`. Tests bypass Clerk by passing an
-  `authenticator` stub; production uses `clerkAuthenticator` (reads `getAuth`).
+  `authenticator` stub. Production uses `clerkAuthenticator(config.corsOrigins)`,
+  which reads `getAuth` and rejects tokens issued to any other origin (Clerk's
+  `azp` claim), as Clerk recommends for production.
 - **Twilio webhook security.** `POST /api/twilio/inbound` and
   `POST /api/twilio/status` are *not* Clerk-protected; they verify Twilio's
   signature instead (`TwilioService.validateSignature`). Set
@@ -156,8 +158,14 @@ from. The two often differ, because the API only redeploys when `apps/api` or
   `apps/web/dist`, root `/`.
   - Pages serves the prerendered `dist/<path>.html` for `/<path>`.
   - With no `404.html`, Pages runs in SPA mode and serves `index.html` for every other path, which covers the dashboard routes.
-  - Don't add a `_redirects` catch-all. Cloudflare applies `_redirects` rules even when a file matches, so it would hide the static pages. Custom domain
-  `textthem.app` (DNS on Cloudflare; registrar IONOS). Node pinned via `.nvmrc`.
+  - Don't add a `_redirects` catch-all. Cloudflare applies `_redirects` rules even when a file matches, so it would hide the static pages.
+  - Custom domain `textthem.app` (DNS on Cloudflare; registrar IONOS). Node pinned via `.nvmrc`.
+  - Build variable `VITE_CLERK_PUBLISHABLE_KEY` is baked in at build time, so changing it needs a redeploy (Deployments → Retry deployment).
+- **Auth → Clerk**: there are two instances.
+  - **Production** (live `pk_live_`/`sk_live_` keys) serves textthem.app. Its domain records (`clerk.`, `accounts.`, `clkmail.`, `clk._domainkey`, `clk2._domainkey`) are DNS-only CNAMEs in Cloudflare, and the Frontend API is `clerk.textthem.app`.
+  - Production is **invite-only**: add organizers under Clerk → Users. Google sign-in uses our own OAuth client in Google Cloud project `textthem-512603`, with redirect `https://clerk.textthem.app/v1/oauth_callback`. Its branding isn't verified, so Google's consent screen shows the domain instead of "Text Them".
+  - Live keys live in Cloudflare (`VITE_CLERK_PUBLISHABLE_KEY`) and Fly (`CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`).
+  - The **development** instance (test keys) is for local dev only, since production won't accept localhost; the root `.env` uses it.
 - **DB → MongoDB Atlas**: the Fly app needs the cluster to allow its egress
   (`0.0.0.0/0` on the free tier) and a `readWrite`-on-`textthem` user.
 
