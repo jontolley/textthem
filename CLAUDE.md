@@ -98,8 +98,10 @@ unique on `groups.keyword`, `members.phoneNumber`, and `deliveries.twilioSid`, u
 
 ### Frontend (`apps/web`)
 React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
-- **Routing splits public vs. authed** (`src/App.tsx`): the per-org public pages
-  in `src/routes/public.tsx` are `/:orgSlug/join` (lists the org's groups),
+- **Routing splits public vs. authed** (`src/App.tsx`). `src/routes/public.tsx`
+  holds Text Them's own `/privacy` and `/terms` (the policies Google's OAuth review
+  reads, so keep the "How We Use Google User Data" section accurate), and the
+  per-org public pages: `/:orgSlug/join` (lists the org's groups),
   `/:orgSlug/:keyword/join` (one group's call to action), `/:orgSlug/privacy`,
   and `/:orgSlug/terms`. They're rendered outside the Clerk `<SignedIn>` gate so
   they're reachable without signing in (required for A2P 10DLC / carrier

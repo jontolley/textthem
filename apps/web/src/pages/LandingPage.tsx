@@ -59,7 +59,10 @@ export function LandingPage() {
                     Keywords {org.groups.map((g) => g.keyword).join(', ')}
                   </span>
                 </span>
-                <ArrowRight className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden="true" />
+                <ArrowRight
+                  className="h-[18px] w-[18px] shrink-0 text-primary"
+                  aria-hidden="true"
+                />
               </Link>
             ))}
             <p className="text-sm leading-relaxed text-teal-50">
@@ -73,17 +76,15 @@ export function LandingPage() {
           <span>
             {PLATFORM_NAME} is owned and operated by {PLATFORM_OPERATOR}.
           </span>
-          {ORGS.map((org) => (
-            <span key={org.slug} className="flex gap-4">
-              {ORGS.length > 1 && <span>{org.name}:</span>}
-              <Link to={orgPath(org, 'privacy')} className="text-white underline underline-offset-2">
-                Privacy
-              </Link>
-              <Link to={orgPath(org, 'terms')} className="text-white underline underline-offset-2">
-                Terms
-              </Link>
-            </span>
-          ))}
+          {/* Text Them's own policies; each program's are linked from its Join page. */}
+          <span className="flex gap-4">
+            <Link to="/privacy" className="text-white underline underline-offset-2">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="text-white underline underline-offset-2">
+              Terms of Service
+            </Link>
+          </span>
         </footer>
       </section>
 

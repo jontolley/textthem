@@ -40,6 +40,10 @@ export interface OrgGroup {
 export const PLATFORM_NAME = 'Text Them';
 /** Who owns and operates the platform (shown on the signed-out landing page). */
 export const PLATFORM_OPERATOR = 'Jon Tolley';
+/** Contact for Text Them itself (privacy and terms questions, account deletion). */
+export const PLATFORM_CONTACT_EMAIL = 'info@textthem.app';
+/** Update whenever Text Them's own Privacy Policy or Terms change. */
+export const PLATFORM_LEGAL_UPDATED = 'October 24, 2026';
 
 export const ORGS: readonly OrgConfig[] = [
   {
