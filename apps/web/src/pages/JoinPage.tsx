@@ -24,7 +24,7 @@ export function JoinPage() {
     <LegalLayout title={`Join ${group.name}`} documentTitle={`Join ${group.name} by Text`}>
       <p>{group.description}</p>
 
-      <div className="mt-6 flex flex-col items-center gap-6 rounded-lg border bg-muted/40 p-6 text-center sm:flex-row sm:text-left">
+      <div className="mt-6 flex flex-col items-center gap-6 rounded-lg border border-primary/20 bg-primary/5 p-6 text-center sm:flex-row sm:text-left">
         <div className="shrink-0 rounded-md bg-white p-3">
           <QRCodeSVG
             value={link}

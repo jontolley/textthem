@@ -38,6 +38,8 @@ export interface OrgGroup {
 
 /** The software platform the programs run on (not the sender). */
 export const PLATFORM_NAME = 'Text Them';
+/** Who owns and operates the platform (shown on the signed-out landing page). */
+export const PLATFORM_OPERATOR = 'Jon Tolley';
 
 export const ORGS: readonly OrgConfig[] = [
   {

@@ -22,10 +22,10 @@ export function LegalLayout({
   useDocumentTitle(documentTitle ?? `${title} · ${org.name}`);
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
+      <header className="bg-primary text-primary-foreground">
         <div className="container flex h-14 items-center">
           <Link to={orgPath(org, 'join')} className="flex items-center gap-2 font-semibold">
-            <MessageSquare className="h-5 w-5" />
+            <MessageSquare className="h-5 w-5" aria-hidden="true" />
             {org.name}
           </Link>
         </div>

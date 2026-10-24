@@ -18,7 +18,18 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={clerkPublishableKey} afterSignOutUrl="/">
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      afterSignOutUrl="/"
+      // Match the app's green theme and font in Clerk's sign-in and user menu.
+      appearance={{
+        variables: {
+          colorPrimary: '#0f766e',
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+          borderRadius: '0.5rem',
+        },
+      }}
+    >
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <App />

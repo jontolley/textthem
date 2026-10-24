@@ -113,6 +113,10 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   `groups` (keyword, name, description) drive its Join pages. Keep them in step
   with the groups in the dashboard: they're config, not read from the API. Add an
   org by adding an entry. SMS reply text still uses the API's single `ORG_NAME`.
+- **Look**: brand green `#0f766e` is the shadcn `--primary` token in
+  `src/index.css`, so buttons, links and the green header bars all follow it.
+  The font is Inter, from Google Fonts in `index.html`. Clerk gets matching
+  `appearance` in `main.tsx`. Signed-out visitors to `/` see `LandingPage`.
 - **API access**: `src/lib/api.ts` `createApiClient(getToken)` attaches the Clerk
   JWT to every request; `src/lib/hooks.ts` wraps it in TanStack Query hooks.
 - Vite reads env from the **repo root** (`envDir` in `vite.config.ts`), so the one
