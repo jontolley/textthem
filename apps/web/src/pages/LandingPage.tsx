@@ -1,6 +1,7 @@
 import { SignIn } from '@clerk/clerk-react';
-import { ArrowRight, MessageSquare } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AppIcon } from '@/components/AppIcon';
 import { ORGS, PLATFORM_NAME, PLATFORM_OPERATOR, orgPath } from '@/config/org';
 import { useDocumentTitle } from '@/lib/document-title';
 
@@ -17,7 +18,7 @@ export function LandingPage() {
       <section className="flex min-w-0 flex-[1_1_520px] flex-col justify-between gap-10 bg-primary px-6 py-10 text-primary-foreground sm:px-12">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 text-lg font-semibold">
-            <MessageSquare className="h-5 w-5" aria-hidden="true" />
+            <AppIcon className="h-8 w-8 rounded-[7px]" />
             {PLATFORM_NAME}
           </div>
           {/* On narrow screens the sign-in form sits below this panel. A button, not a

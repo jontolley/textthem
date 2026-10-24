@@ -117,6 +117,10 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   `src/index.css`, so buttons, links and the green header bars all follow it.
   The font is Inter, from Google Fonts in `index.html`. Clerk gets matching
   `appearance` in `main.tsx`. Signed-out visitors to `/` see `LandingPage`.
+- **Icons**: `apps/web/public` holds the favicon, Apple and Android icons, and
+  `site.webmanifest`. They're rendered from the SVGs in `apps/web/icons/` by
+  `python3 apps/web/icons/render.py`, which needs Chrome and Pillow. Edit the
+  SVGs, then rerun it.
 - **API access**: `src/lib/api.ts` `createApiClient(getToken)` attaches the Clerk
   JWT to every request; `src/lib/hooks.ts` wraps it in TanStack Query hooks.
 - Vite reads env from the **repo root** (`envDir` in `vite.config.ts`), so the one

@@ -1,5 +1,5 @@
-import { MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AppIcon } from '@/components/AppIcon';
 import { orgPath } from '@/config/org';
 import { useDocumentTitle } from '@/lib/document-title';
 import { useOrg } from '@/lib/org-context';
@@ -25,7 +25,7 @@ export function LegalLayout({
       <header className="bg-primary text-primary-foreground">
         <div className="container flex h-14 items-center">
           <Link to={orgPath(org, 'join')} className="flex items-center gap-2 font-semibold">
-            <MessageSquare className="h-5 w-5" aria-hidden="true" />
+            <AppIcon />
             {org.name}
           </Link>
         </div>

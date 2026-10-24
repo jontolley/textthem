@@ -1,6 +1,6 @@
 import { UserButton } from '@clerk/clerk-react';
-import { MessageSquare } from 'lucide-react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { AppIcon } from '@/components/AppIcon';
 import { cn } from '@/lib/utils';
 
 // Links sit on the green header bar; the active one is underlined in white.
@@ -18,7 +18,7 @@ export function Layout() {
         <div className="container flex h-14 items-center justify-between gap-4">
           <div className="flex items-center gap-4 sm:gap-6">
             <Link to="/" className="flex items-center gap-2 font-semibold">
-              <MessageSquare className="h-5 w-5" aria-hidden="true" />
+              <AppIcon />
               Text Them
             </Link>
             <nav className="flex items-center gap-4">
