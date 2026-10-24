@@ -49,7 +49,7 @@ async function subscribedCounts(
 }
 
 export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
-  const { groups, subscriptions, members } = fastify.mongo.collections;
+  const { groups, subscriptions, members, messages } = fastify.mongo.collections;
 
   // All routes in this plugin require authentication.
   fastify.addHook('preHandler', fastify.requireAuth);
@@ -124,6 +124,8 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     const result = await groups.deleteOne({ _id: id });
     if (result.deletedCount === 0) throw notFound('Group not found');
     await subscriptions.deleteMany({ groupId: id });
+    // Nothing left to send them to.
+    await messages.updateMany({ groupId: id, status: 'scheduled' }, { $set: { status: 'canceled' } });
     reply.code(204);
   });
 

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { useBroadcast, useDeleteGroup, useGroup, useGroupMembers } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
+import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
 
 const MAX_LENGTH = 1600;
 
@@ -27,15 +29,26 @@ export function GroupDetailPage() {
   const broadcast = useBroadcast(id);
   const deleteGroup = useDeleteGroup();
   const [body, setBody] = useState('');
+  const [scheduleLater, setScheduleLater] = useState(false);
+  // Local wall-clock time from the datetime-local input, e.g. "2026-10-25T09:00".
+  const [sendAt, setSendAt] = useState(() => toLocalInputValue(defaultSendTime()));
 
   async function handleBroadcast(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const res = await broadcast.mutateAsync(body.trim());
+      const res = await broadcast.mutateAsync({
+        body: body.trim(),
+        // A datetime-local value without an offset parses as the browser's local time.
+        sendAt: scheduleLater ? new Date(sendAt).toISOString() : undefined,
+      });
+      const { message } = res;
       toast.success(
-        `Queued ${res.message.acceptedCount} of ${res.message.recipientCount} texts. Delivery status shows in History.`,
+        message.status === 'scheduled' && message.scheduledFor
+          ? `Scheduled for ${formatDateTime(message.scheduledFor)}. You can edit or cancel it in History.`
+          : `Queued ${message.acceptedCount} of ${message.recipientCount} texts. Delivery status shows in History.`,
       );
       setBody('');
+      setScheduleLater(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Failed to send broadcast');
     }
@@ -93,13 +106,50 @@ export function GroupDetailPage() {
               rows={4}
               required
             />
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={scheduleLater}
+                  onChange={(e) => setScheduleLater(e.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+                Schedule for later
+              </label>
+              {scheduleLater && (
+                <Input
+                  type="datetime-local"
+                  aria-label="Send at"
+                  value={sendAt}
+                  min={toLocalInputValue(new Date())}
+                  onChange={(e) => setSendAt(e.target.value)}
+                  className="w-auto"
+                  required
+                />
+              )}
+            </div>
+            {scheduleLater && (
+              <p className="text-xs text-muted-foreground">
+                It goes to whoever is subscribed at that time, in your time zone. You can edit or
+                cancel it from History until then.
+              </p>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {body.length}/{MAX_LENGTH}
               </span>
-              <Button type="submit" disabled={broadcast.isPending || memberCount === 0}>
-                <Send className="h-4 w-4" />
-                {broadcast.isPending ? 'Sending…' : `Send to ${memberCount}`}
+              <Button
+                type="submit"
+                disabled={broadcast.isPending || (!scheduleLater && memberCount === 0)}
+              >
+                {scheduleLater ? <CalendarClock className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                {scheduleLater
+                  ? broadcast.isPending
+                    ? 'Scheduling…'
+                    : 'Schedule'
+                  : broadcast.isPending
+                    ? 'Sending…'
+                    : `Send to ${memberCount}`}
               </Button>
             </div>
           </form>

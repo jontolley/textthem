@@ -6,6 +6,7 @@ import type {
   ListGroupsResponse,
   ListMessagesResponse,
   UpdateGroupRequest,
+  UpdateScheduledBroadcastRequest,
 } from '@text-them/shared';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
@@ -58,12 +59,20 @@ export function createApiClient(getToken: TokenGetter) {
     deleteGroup: (id: string) => request<void>(`/api/groups/${id}`, { method: 'DELETE' }),
     listGroupMembers: (id: string) =>
       request<ListGroupMembersResponse>(`/api/groups/${id}/members`),
-    broadcast: (id: string, body: string) =>
+    /** Sends now, or schedules when `sendAt` (ISO) is given. */
+    broadcast: (id: string, body: string, sendAt?: string) =>
       request<BroadcastResponse>(`/api/groups/${id}/broadcast`, {
         method: 'POST',
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body, sendAt }),
       }),
     listMessages: () => request<ListMessagesResponse>('/api/messages'),
+    updateScheduledBroadcast: (id: string, body: UpdateScheduledBroadcastRequest) =>
+      request<BroadcastResponse>(`/api/messages/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    cancelScheduledBroadcast: (id: string) =>
+      request<BroadcastResponse>(`/api/messages/${id}/cancel`, { method: 'POST' }),
   };
 }
 

@@ -67,11 +67,34 @@ export interface DeliveryStats {
   topErrorCode?: string;
 }
 
+/**
+ * Where a broadcast is in its life:
+ * - scheduled: waiting for its send time; can still be edited or canceled.
+ * - sending: texts are going out now.
+ * - sent: done; counts and delivery stats are final(ish).
+ * - canceled: canceled before its send time.
+ * - missed: the API was down past the send time by more than the cutoff, so
+ *   it was not sent late.
+ * - interrupted: sending started but didn't finish (e.g. a restart); some
+ *   members may have been texted, so it is not retried automatically.
+ */
+export type BroadcastStatus =
+  | 'scheduled'
+  | 'sending'
+  | 'sent'
+  | 'canceled'
+  | 'missed'
+  | 'interrupted';
+
 export interface BroadcastMessage {
   id: string;
   groupId: string;
   body: string;
   sentByUserId: string;
+  status: BroadcastStatus;
+  /** When it was scheduled to go out (scheduled broadcasts only). */
+  scheduledFor?: string;
+  /** Members it went to; 0 until sent, since recipients are picked at send time. */
   recipientCount: number;
   /** Number of sends Twilio accepted (queued). Not proof of delivery. */
   acceptedCount: number;
@@ -79,7 +102,8 @@ export interface BroadcastMessage {
   failedCount: number;
   /** Absent for broadcasts sent before delivery tracking existed. */
   delivery?: DeliveryStats;
-  sentAt: string;
+  /** Set once sent. */
+  sentAt?: string;
 }
 
 // ─── API request/response DTOs ────────────────────────────────────────
@@ -95,6 +119,14 @@ export type UpdateGroupRequest = Partial<CreateGroupRequest>;
 
 export interface BroadcastRequest {
   body: string;
+  /** ISO-8601 time to send at. Omit to send now. */
+  sendAt?: string;
+}
+
+/** Edits a broadcast that is still scheduled. */
+export interface UpdateScheduledBroadcastRequest {
+  body?: string;
+  sendAt?: string;
 }
 
 export interface BroadcastResponse {

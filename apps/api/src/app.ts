@@ -9,6 +9,7 @@ import { groupRoutes } from './routes/groups.js';
 import { messageRoutes } from './routes/messages.js';
 import { STATUS_CALLBACK_PATH, twilioRoutes } from './routes/twilio.js';
 import { HttpError } from './errors.js';
+import { startScheduler, type Scheduler } from './services/broadcasts.js';
 import type { TwilioService } from './services/twilio.js';
 import type { AppConfig } from './config.js';
 
@@ -19,6 +20,11 @@ export interface BuildAppOptions {
   database?: Database;
   /** Override the authenticator (tests inject a stub). */
   authenticator?: Authenticator;
+  /**
+   * Check for due scheduled broadcasts this often (production). Left unset in
+   * tests, which run the scheduler pass directly.
+   */
+  schedulerIntervalMs?: number;
   fastifyOptions?: FastifyServerOptions;
 }
 
@@ -77,6 +83,8 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     publicBaseUrl: config.PUBLIC_BASE_URL,
   });
 
+  const statusCallbackUrl = new URL(STATUS_CALLBACK_PATH, config.PUBLIC_BASE_URL).toString();
+
   // ─── Protected routes (Clerk middleware scoped to this child) ────────
   await app.register(async (scope) => {
     if (usingClerk) {
@@ -86,11 +94,25 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
       });
     }
     await scope.register(groupRoutes);
-    await scope.register(messageRoutes, {
-      twilio: opts.twilio,
-      statusCallbackUrl: new URL(STATUS_CALLBACK_PATH, config.PUBLIC_BASE_URL).toString(),
-    });
+    await scope.register(messageRoutes, { twilio: opts.twilio, statusCallbackUrl });
   });
+
+  // ─── Scheduled broadcasts ───────────────────────────────────────────
+  const { schedulerIntervalMs } = opts;
+  if (schedulerIntervalMs) {
+    let scheduler: Scheduler | undefined;
+    app.addHook('onReady', async () => {
+      scheduler = startScheduler(
+        { collections: app.mongo.collections, twilio: opts.twilio, statusCallbackUrl },
+        schedulerIntervalMs,
+        app.log,
+      );
+    });
+    // Let a pass in progress finish before the database connection closes.
+    app.addHook('preClose', async () => {
+      await scheduler?.stop();
+    });
+  }
 
   return app;
 }

@@ -20,10 +20,12 @@ export function serializeMessage(doc: MessageDoc, delivery?: DeliveryStats): Bro
     groupId: doc.groupId.toHexString(),
     body: doc.body,
     sentByUserId: doc.sentByUserId,
+    status: doc.status ?? 'sent',
+    scheduledFor: doc.scheduledFor?.toISOString(),
     recipientCount: doc.recipientCount,
     acceptedCount: doc.acceptedCount,
     failedCount: doc.failedCount,
     delivery,
-    sentAt: doc.sentAt.toISOString(),
+    sentAt: doc.sentAt?.toISOString(),
   };
 }

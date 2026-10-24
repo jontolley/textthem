@@ -6,7 +6,11 @@ import {
   useQueryClient,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { CreateGroupRequest, UpdateGroupRequest } from '@text-them/shared';
+import type {
+  CreateGroupRequest,
+  UpdateGroupRequest,
+  UpdateScheduledBroadcastRequest,
+} from '@text-them/shared';
 import { createApiClient, type ApiClient } from './api';
 
 /** Builds an API client bound to the current Clerk session token. */
@@ -81,11 +85,32 @@ export function useDeleteGroup() {
   });
 }
 
+/** Sends now, or schedules when `sendAt` (ISO) is given. */
 export function useBroadcast(groupId: string) {
   const api = useApiClient();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: string) => api.broadcast(groupId, body),
+    mutationFn: ({ body, sendAt }: { body: string; sendAt?: string }) =>
+      api.broadcast(groupId, body, sendAt),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
+  });
+}
+
+export function useUpdateScheduledBroadcast() {
+  const api = useApiClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateScheduledBroadcastRequest }) =>
+      api.updateScheduledBroadcast(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
+  });
+}
+
+export function useCancelScheduledBroadcast() {
+  const api = useApiClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.cancelScheduledBroadcast(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
   });
 }

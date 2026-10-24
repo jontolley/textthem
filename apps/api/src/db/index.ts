@@ -46,6 +46,7 @@ export async function ensureIndexes(collections: Collections): Promise<void> {
   );
   await collections.subscriptions.createIndex({ groupId: 1, status: 1 });
   await collections.messages.createIndex({ groupId: 1, sentAt: -1 });
+  await collections.messages.createIndex({ status: 1, scheduledFor: 1 });
   await collections.deliveries.createIndex({ twilioSid: 1 }, { unique: true });
   await collections.deliveries.createIndex({ broadcastId: 1 });
   await collections.inboundMessages.createIndex({ receivedAt: -1 });

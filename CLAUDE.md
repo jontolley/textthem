@@ -70,6 +70,15 @@ stubs (see `src/routes/groups.test.ts`).
 - **Outbound sender is either/or.** `src/services/twilio.ts` uses a Messaging
   Service when `TWILIO_MESSAGING_SERVICE_SID` is set, otherwise `TWILIO_FROM_NUMBER`.
   Config validation requires at least one.
+- **Scheduled broadcasts.** `src/services/broadcasts.ts` holds `sendBroadcast`,
+  which both "send now" and the scheduler use. Recipients are the group's
+  subscribers at send time. `server.ts` passes `schedulerIntervalMs` (30s) to
+  `buildApp`, which runs `runDueBroadcasts` on that timer; tests call it
+  directly with a fake `now`. Each due broadcast is claimed atomically
+  (`scheduled` → `sending`) before any text goes out, so it never sends twice.
+  - One more than an hour late is marked `missed`, not sent.
+  - One stuck in `sending` for over 10 minutes is marked `interrupted` and never retried.
+  - This relies on Fly keeping a machine running (`min_machines_running = 1`).
 - **Delivery tracking.** Broadcast sends pass `statusCallback`
   (`PUBLIC_BASE_URL` + `/api/twilio/status`). `src/services/deliveries.ts` keeps one
   `deliveries` doc per Message SID; callbacks only move a status forward (they
@@ -78,7 +87,8 @@ stubs (see `src/routes/groups.test.ts`).
 
 ### Data model
 Collections: `groups`, `members`, `subscriptions` (the opt-in audit trail with
-status + timestamps), `messages` (broadcast log), `deliveries` (per-recipient
+status + timestamps), `messages` (broadcasts, including scheduled ones: `status` is
+scheduled/sending/sent/canceled/missed/interrupted, absent = sent), `deliveries` (per-recipient
 Twilio status of each broadcast send), `inbound_messages` (every received SMS). Indexes are created on boot in `src/db/index.ts` (`ensureIndexes`):
 unique on `groups.keyword`, `members.phoneNumber`, and `deliveries.twilioSid`, unique compound
 `{memberId, groupId}` on subscriptions. The database name is **`textthem`**

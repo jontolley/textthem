@@ -1,5 +1,10 @@
 import type { ObjectId } from 'mongodb';
-import type { SubscriptionSource, SubscriptionStatus, InboundAction } from '@text-them/shared';
+import type {
+  BroadcastStatus,
+  InboundAction,
+  SubscriptionSource,
+  SubscriptionStatus,
+} from '@text-them/shared';
 
 /**
  * Internal MongoDB document shapes. These use ObjectId/Date; routes map them to
@@ -39,10 +44,18 @@ export interface MessageDoc {
   groupId: ObjectId;
   body: string;
   sentByUserId: string;
+  /** Absent on broadcasts from before scheduling existed, which were all sent. */
+  status?: BroadcastStatus;
+  /** Requested send time (scheduled broadcasts only). */
+  scheduledFor?: Date;
+  /** When sending began; a send stuck past a cutoff is marked interrupted. */
+  sendingStartedAt?: Date;
+  /** 0 until sent: recipients are the group's subscribers at send time. */
   recipientCount: number;
   acceptedCount: number;
   failedCount: number;
-  sentAt: Date;
+  /** Set once sent. */
+  sentAt?: Date;
 }
 
 /**
