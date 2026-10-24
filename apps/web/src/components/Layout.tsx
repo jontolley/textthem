@@ -27,6 +27,9 @@ export function Layout() {
               <NavLink to="/history" className={navClass}>
                 History
               </NavLink>
+              <NavLink to="/help" className={navClass}>
+                Help
+              </NavLink>
             </nav>
           </div>
           <UserButton />

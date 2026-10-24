@@ -149,6 +149,18 @@ export interface ListMessagesResponse {
   messages: BroadcastMessage[];
 }
 
+/** Which build is running. Null fields mean a local/dev build that wasn't stamped. */
+export interface VersionInfo {
+  /** Full git commit SHA the build came from. */
+  commit: string | null;
+  /** ISO-8601 time the build was made. */
+  builtAt: string | null;
+}
+
+export interface VersionResponse {
+  api: VersionInfo;
+}
+
 export interface ApiError {
   error: string;
   message: string;

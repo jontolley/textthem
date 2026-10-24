@@ -7,6 +7,7 @@ import type {
   ListMessagesResponse,
   UpdateGroupRequest,
   UpdateScheduledBroadcastRequest,
+  VersionResponse,
 } from '@text-them/shared';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
@@ -73,6 +74,7 @@ export function createApiClient(getToken: TokenGetter) {
       }),
     cancelScheduledBroadcast: (id: string) =>
       request<BroadcastResponse>(`/api/messages/${id}/cancel`, { method: 'POST' }),
+    getVersion: () => request<VersionResponse>('/api/version'),
   };
 }
 

@@ -51,6 +51,16 @@ export function useMessages() {
   });
 }
 
+/** The running API's build; always refetched so a fresh deploy shows up. */
+export function useApiVersion() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['version'],
+    queryFn: () => api.getVersion().then((r) => r.api),
+    staleTime: 0,
+  });
+}
+
 export function useCreateGroup() {
   const api = useApiClient();
   const qc = useQueryClient();

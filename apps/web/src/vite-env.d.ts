@@ -8,3 +8,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Git commit this build came from (set in vite.config.ts); null in the dev server. */
+declare const __APP_COMMIT__: string | null;
+/** ISO-8601 build time (set in vite.config.ts); null in the dev server. */
+declare const __APP_BUILT_AT__: string | null;

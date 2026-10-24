@@ -8,6 +8,7 @@ import { authPlugin, clerkAuthenticator, type Authenticator } from './plugins/au
 import { groupRoutes } from './routes/groups.js';
 import { messageRoutes } from './routes/messages.js';
 import { STATUS_CALLBACK_PATH, twilioRoutes } from './routes/twilio.js';
+import { versionRoutes } from './routes/version.js';
 import { HttpError } from './errors.js';
 import { startScheduler, type Scheduler } from './services/broadcasts.js';
 import type { TwilioService } from './services/twilio.js';
@@ -95,6 +96,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     }
     await scope.register(groupRoutes);
     await scope.register(messageRoutes, { twilio: opts.twilio, statusCallbackUrl });
+    await scope.register(versionRoutes, { commit: config.GIT_SHA, builtAt: config.BUILT_AT });
   });
 
   // ─── Scheduled broadcasts ───────────────────────────────────────────

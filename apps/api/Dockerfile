@@ -30,5 +30,11 @@ COPY --from=build /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 
+# Which build this is, shown on the dashboard's Help page. Passed by the deploy
+# workflow (--build-arg); declared last so a new commit only rebuilds this layer.
+ARG GIT_SHA
+ARG BUILT_AT
+ENV GIT_SHA=$GIT_SHA BUILT_AT=$BUILT_AT
+
 EXPOSE 8080
 CMD ["node", "apps/api/dist/server.js"]

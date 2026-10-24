@@ -31,6 +31,10 @@ const envSchema = z.object({
 
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
+
+  // Stamped into the image by the deploy (Dockerfile build args); unset locally.
+  GIT_SHA: z.string().optional().transform((v) => v || undefined),
+  BUILT_AT: z.string().optional().transform((v) => v || undefined),
 }).refine((env) => env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_FROM_NUMBER, {
   message: 'Set TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER (at least one)',
   path: ['TWILIO_MESSAGING_SERVICE_SID'],

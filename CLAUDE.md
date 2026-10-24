@@ -118,6 +118,15 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
 - Vite reads env from the **repo root** (`envDir` in `vite.config.ts`), so the one
   root `.env` serves both api and web; only `VITE_`-prefixed vars reach the client.
 
+### Version info
+The dashboard's Help page (`/help`) shows which commit each side was built
+from, and whether they match.
+- **Dashboard:** `vite.config.ts` bakes in `__APP_COMMIT__` (Cloudflare's
+  `CF_PAGES_COMMIT_SHA`, else `git rev-parse HEAD`) and `__APP_BUILT_AT__`.
+  Both are null in the dev server.
+- **API:** the image gets `GIT_SHA`/`BUILT_AT` as Docker build args from the
+  deploy workflow. Signed-in users can read them at `GET /api/version`.
+
 ## Environment & secrets
 - Local dev loads the **root `.env`** (git-ignored). `.env.example` documents all
   vars. `apps/api/.env.local` and `apps/api/.env.production.local` hold secrets for
@@ -127,8 +136,11 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   start on invalid/missing env.
 
 ## Deployment
-- **API → Fly.io** (`apps/api/fly.toml`, app `textthem-api`). Build context is the
-  repo root: `fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile .`.
+- **API → Fly.io** (`apps/api/fly.toml`, app `textthem-api`). Pushes to `main`
+  deploy via `.github/workflows/deploy-api.yml`. Build context is the repo root.
+  A manual deploy should pass the version stamp too, or the Help page shows
+  "Local build":
+  `fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile --build-arg GIT_SHA=$(git rev-parse HEAD) --build-arg BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) .`
   Secrets (`MONGODB_URI`, Twilio, Clerk, `CORS_ORIGINS`, `PUBLIC_BASE_URL`) are set
   via `fly secrets`; non-secret env (`MONGODB_DB_NAME`, `PORT`) is in `fly.toml`.
 - **Web → Cloudflare Pages**: build command `npm run build:web`, output

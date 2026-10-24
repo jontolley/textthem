@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useRoutes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { GroupsPage } from './pages/GroupsPage';
 import { GroupDetailPage } from './pages/GroupDetailPage';
+import { HelpPage } from './pages/HelpPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { publicRoutes } from './routes/public';
 
@@ -33,6 +34,7 @@ function DashboardApp() {
             <Route index element={<GroupsPage />} />
             <Route path="groups/:id" element={<GroupDetailPage />} />
             <Route path="history" element={<HistoryPage />} />
+            <Route path="help" element={<HelpPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
