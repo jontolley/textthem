@@ -61,6 +61,10 @@ stubs (see `src/routes/groups.test.ts`).
   `authenticator` stub. Production uses `clerkAuthenticator(config.corsOrigins)`,
   which reads `getAuth` and rejects tokens issued to any other origin (Clerk's
   `azp` claim), as Clerk recommends for production.
+  - `requireAuth` also enforces `ORGANIZER_USER_IDS` (comma-separated Clerk user IDs): any other signed-in user gets 403.
+  - The API refuses to start in production with an empty list. Locally an empty list allows any signed-in user.
+  - The dashboard's `AccessGate` calls `GET /api/me` first and shows a no-access screen on 403.
+  - Production's list is a Fly secret, so adding an organizer means two steps: invite them in Clerk, then add their user ID to the secret.
 - **Twilio webhook security.** `POST /api/twilio/inbound` and
   `POST /api/twilio/status` are *not* Clerk-protected; they verify Twilio's
   signature instead (`TwilioService.validateSignature`). Set
@@ -150,11 +154,13 @@ from. The two often differ, because the API only redeploys when `apps/api` or
 
 ## Deployment
 - **API → Fly.io** (`apps/api/fly.toml`, app `textthem-api`). Pushes to `main`
-  deploy via `.github/workflows/deploy-api.yml`. Build context is the repo root.
+  deploy via `.github/workflows/deploy-api.yml`, which runs the API's typecheck
+  and tests first and deploys only if they pass. Build context is the repo root.
   A manual deploy should pass the version stamp too, or the Help page shows
   "Local build":
   `fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile --build-arg GIT_SHA=$(git rev-parse HEAD) --build-arg BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) .`
-  Secrets (`MONGODB_URI`, Twilio, Clerk, `CORS_ORIGINS`, `PUBLIC_BASE_URL`) are set
+  Secrets (`MONGODB_URI`, Twilio, Clerk, `CORS_ORIGINS`, `PUBLIC_BASE_URL`,
+  `ORGANIZER_USER_IDS`) are set
   via `fly secrets`; non-secret env (`MONGODB_DB_NAME`, `PORT`) is in `fly.toml`.
 - **Web → Cloudflare Pages**: build command `npm run build:web`, output
   `apps/web/dist`, root `/`.
@@ -163,6 +169,7 @@ from. The two often differ, because the API only redeploys when `apps/api` or
   - Don't add a `_redirects` catch-all. Cloudflare applies `_redirects` rules even when a file matches, so it would hide the static pages.
   - Custom domain `textthem.app` (DNS on Cloudflare; registrar IONOS). Node pinned via `.nvmrc`.
   - Build variable `VITE_CLERK_PUBLISHABLE_KEY` is baked in at build time, so changing it needs a redeploy (Deployments → Retry deployment).
+  - `apps/web/public/_headers` adds security headers to every page: HSTS, no framing, and a permissions policy.
 - **Auth → Clerk**: there are two instances.
   - **Production** (live `pk_live_`/`sk_live_` keys) serves textthem.app. Its domain records (`clerk.`, `accounts.`, `clkmail.`, `clk._domainkey`, `clk2._domainkey`) are DNS-only CNAMEs in Cloudflare, and the Frontend API is `clerk.textthem.app`.
   - Production is **invite-only**: add organizers under Clerk → Users. Google sign-in uses our own OAuth client in Google Cloud project `textthem-512603`, with redirect `https://clerk.textthem.app/v1/oauth_callback`. Its branding isn't verified, so Google's consent screen shows the domain instead of "Text Them".

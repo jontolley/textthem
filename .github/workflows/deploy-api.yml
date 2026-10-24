@@ -10,7 +10,22 @@ on:
       - '.github/workflows/deploy-api.yml'
 
 jobs:
+  # Deploy only what passes the tests (CI runs separately and doesn't gate this).
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace @text-them/shared
+      - run: npm run typecheck --workspace @text-them/api
+      - run: npm test --workspace @text-them/api
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     concurrency: deploy-api
     steps:

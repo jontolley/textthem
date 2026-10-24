@@ -1,0 +1,12 @@
+# Security headers for every page Cloudflare Pages serves (see CLAUDE.md).
+# - HSTS: browsers always use HTTPS for textthem.app (subdomains left out on
+#   purpose, since Clerk's and the mail records live there).
+# - Frame protection: no other site may embed these pages (clickjacking).
+# - Permissions-Policy: the site uses no camera, microphone, location, etc.
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

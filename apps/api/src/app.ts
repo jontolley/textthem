@@ -8,6 +8,7 @@ import { authPlugin, clerkAuthenticator, type Authenticator } from './plugins/au
 import { groupRoutes } from './routes/groups.js';
 import { messageRoutes } from './routes/messages.js';
 import { STATUS_CALLBACK_PATH, twilioRoutes } from './routes/twilio.js';
+import { meRoutes } from './routes/me.js';
 import { versionRoutes } from './routes/version.js';
 import { HttpError } from './errors.js';
 import { startScheduler, type Scheduler } from './services/broadcasts.js';
@@ -74,6 +75,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   await app.register(authPlugin, {
     // The dashboard's origins are exactly the CORS origins.
     authenticator: opts.authenticator ?? clerkAuthenticator(config.corsOrigins),
+    organizerUserIds: config.ORGANIZER_USER_IDS,
   });
 
   // ─── Public routes (no Clerk) ───────────────────────────────────────
@@ -98,6 +100,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     await scope.register(groupRoutes);
     await scope.register(messageRoutes, { twilio: opts.twilio, statusCallbackUrl });
     await scope.register(versionRoutes, { commit: config.GIT_SHA, builtAt: config.BUILT_AT });
+    await scope.register(meRoutes);
   });
 
   // ─── Scheduled broadcasts ───────────────────────────────────────────

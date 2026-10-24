@@ -1,0 +1,18 @@
+# Dependabot proposes dependency updates as pull requests. Minor and patch
+# updates are grouped into one PR a week; major versions (breaking changes,
+# e.g. zod 4 or react-router 7) come as separate PRs to review on their own.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

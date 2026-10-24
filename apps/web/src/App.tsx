@@ -1,5 +1,6 @@
 import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import { Navigate, Route, Routes, useRoutes } from 'react-router-dom';
+import { AccessGate } from './components/AccessGate';
 import { Layout } from './components/Layout';
 import { GroupsPage } from './pages/GroupsPage';
 import { GroupDetailPage } from './pages/GroupDetailPage';
@@ -24,15 +25,17 @@ function DashboardApp() {
       </SignedOut>
 
       <SignedIn>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<GroupsPage />} />
-            <Route path="groups/:id" element={<GroupDetailPage />} />
-            <Route path="history" element={<HistoryPage />} />
-            <Route path="help" element={<HelpPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+        <AccessGate>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<GroupsPage />} />
+              <Route path="groups/:id" element={<GroupDetailPage />} />
+              <Route path="history" element={<HistoryPage />} />
+              <Route path="help" element={<HelpPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </AccessGate>
       </SignedIn>
     </>
   );

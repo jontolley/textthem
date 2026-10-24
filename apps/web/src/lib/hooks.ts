@@ -51,6 +51,16 @@ export function useMessages() {
   });
 }
 
+/** The signed-in organizer. A 403 means this account isn't an organizer. */
+export function useMe() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.getMe(),
+    retry: false,
+  });
+}
+
 /** The running API's build; always refetched so a fresh deploy shows up. */
 export function useApiVersion() {
   const api = useApiClient();

@@ -37,11 +37,14 @@ declare module 'fastify' {
 
 export interface AuthPluginOptions {
   authenticator: Authenticator;
+  /** Signed-in users allowed through; empty allows any signed-in user (local dev). */
+  organizerUserIds: string[];
 }
 
 /**
  * Decorates the instance with `request.userId` and a `requireAuth` preHandler
- * that rejects unauthenticated requests with 401. Registered with `fp` so the
+ * that rejects unauthenticated requests with 401, and signed-in users who
+ * aren't organizers with 403. Registered with `fp` so the
  * decorators are visible app-wide; the Clerk middleware itself is registered
  * separately and scoped to only the protected routes (see app.ts).
  */
@@ -51,6 +54,10 @@ export const authPlugin = fp<AuthPluginOptions>(async (fastify, opts) => {
     const userId = await opts.authenticator(request);
     if (!userId) {
       throw new HttpError(401, 'unauthorized', 'Authentication required');
+    }
+    const { organizerUserIds } = opts;
+    if (organizerUserIds.length > 0 && !organizerUserIds.includes(userId)) {
+      throw new HttpError(403, 'forbidden', "This account doesn't have access to Text Them");
     }
     request.userId = userId;
   });

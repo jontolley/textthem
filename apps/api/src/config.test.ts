@@ -25,3 +25,20 @@ describe('loadConfig — outbound sender', () => {
     expect(() => loadConfig(base)).toThrow(/TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER/);
   });
 });
+
+describe('loadConfig — organizer allowlist', () => {
+  const env = { ...base, TWILIO_MESSAGING_SERVICE_SID: 'MG_test' } as NodeJS.ProcessEnv;
+
+  it('parses a comma-separated list of Clerk user IDs', () => {
+    const config = loadConfig({ ...env, ORGANIZER_USER_IDS: ' user_a, user_b ,' });
+    expect(config.ORGANIZER_USER_IDS).toEqual(['user_a', 'user_b']);
+  });
+
+  it('allows an empty list outside production', () => {
+    expect(loadConfig(env).ORGANIZER_USER_IDS).toEqual([]);
+  });
+
+  it('refuses to start in production without organizers', () => {
+    expect(() => loadConfig({ ...env, NODE_ENV: 'production' })).toThrow(/ORGANIZER_USER_IDS/);
+  });
+});

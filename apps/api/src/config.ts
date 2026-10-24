@@ -35,9 +35,20 @@ const envSchema = z.object({
   // Stamped into the image by the deploy (Dockerfile build args); unset locally.
   GIT_SHA: z.string().optional().transform((v) => v || undefined),
   BUILT_AT: z.string().optional().transform((v) => v || undefined),
+
+  // Clerk user IDs allowed to use the dashboard API, comma-separated. Required in
+  // production, so access never depends on Clerk's sign-up setting alone; empty
+  // locally means any signed-in user.
+  ORGANIZER_USER_IDS: z
+    .string()
+    .default('')
+    .transform((v) => v.split(',').map((id) => id.trim()).filter(Boolean)),
 }).refine((env) => env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_FROM_NUMBER, {
   message: 'Set TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER (at least one)',
   path: ['TWILIO_MESSAGING_SERVICE_SID'],
+}).refine((env) => env.NODE_ENV !== 'production' || env.ORGANIZER_USER_IDS.length > 0, {
+  message: 'Set ORGANIZER_USER_IDS (comma-separated Clerk user IDs) in production',
+  path: ['ORGANIZER_USER_IDS'],
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;

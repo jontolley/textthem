@@ -161,6 +161,11 @@ export interface VersionResponse {
   api: VersionInfo;
 }
 
+/** The signed-in organizer, as the API sees them. */
+export interface MeResponse {
+  userId: string;
+}
+
 export interface ApiError {
   error: string;
   message: string;
