@@ -15,6 +15,9 @@ export const STATUS_CALLBACK_PATH = '/api/twilio/status';
 const inboundSchema = z.object({
   From: z.string().min(1),
   Body: z.string().default(''),
+  // Set by Twilio's Advanced Opt-Out (STOP, START, or HELP) when it has already
+  // sent its own reply.
+  OptOutType: z.string().optional(),
 });
 
 const statusSchema = z.object({
@@ -77,7 +80,8 @@ export async function twilioRoutes(
     await collections.inboundMessages.insertOne(log);
 
     const twiml = new twilio.twiml.MessagingResponse();
-    twiml.message(result.reply);
+    // Twilio asks apps not to reply again to a keyword its opt-out handling answered.
+    if (result.reply && !parsed.data.OptOutType) twiml.message(result.reply);
     return reply.header('Content-Type', 'text/xml').send(twiml.toString());
   });
 

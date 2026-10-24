@@ -75,6 +75,8 @@ describe('processInbound', () => {
 
     const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'STOP');
     expect(result.action).toBe('stop');
+    // Twilio's opt-out handling sends the confirmation; a reply from us would be blocked.
+    expect(result.reply).toBeUndefined();
 
     const subs = await database.collections.subscriptions.find({}).toArray();
     expect(subs).toHaveLength(2);
@@ -94,16 +96,15 @@ describe('processInbound', () => {
     expect(sub?.unsubscribedAt).toBeUndefined();
   });
 
-  it.each(['START', 'unstop'])('tells a member to text a keyword after %s', async (keyword) => {
+  it.each(['START', 'unstop'])('stays silent on %s and leaves groups alone', async (keyword) => {
     await seedGroup();
     await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'DRAGON');
     await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'STOP');
 
     const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, keyword);
     expect(result.action).toBe('start');
-    expect(result.reply).toBe(
-      `${ORG}: You're opted back in. Text a group keyword to join or rejoin a group. Reply HELP for help, STOP to opt out.`,
-    );
+    // Twilio's opt-out handling sends the START reply; ours would be a duplicate.
+    expect(result.reply).toBeUndefined();
 
     // Opting back in to Twilio doesn't rejoin any group.
     const member = await database.collections.members.findOne({ phoneNumber: PHONE });

@@ -72,7 +72,12 @@ stubs (see `src/routes/groups.test.ts`).
 - **Core inbound logic is isolated** in `src/services/subscriptions.ts`
   (`processInbound`): it normalizes the body and dispatches STOP/HELP/keyword →
   subscription state changes. STOP and HELP are matched before group keywords so
-  they always win (carrier compliance). This is the most test-covered unit.
+  they always win (carrier compliance). STOP and START/UNSTOP get no reply from us:
+  Twilio's opt-out handling answers them (and blocks a STOP reply with error
+  21610). The inbound route also skips any reply when Twilio sets `OptOutType`,
+  which means its Advanced Opt-Out already answered (e.g. HELP). The branded
+  STOP/START/HELP texts live in Twilio → Messaging Service → Opt-out tab, which
+  is Console-only (no API), not in this code. This is the most test-covered unit.
 - **Outbound sender is either/or.** `src/services/twilio.ts` uses a Messaging
   Service when `TWILIO_MESSAGING_SERVICE_SID` is set, otherwise `TWILIO_FROM_NUMBER`.
   Config validation requires at least one.

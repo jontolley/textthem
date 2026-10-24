@@ -126,6 +126,47 @@ describe('groups API', () => {
     expect(group.memberCount).toBe(2);
   });
 
+  it('answers STOP with an empty TwiML response', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/twilio/inbound',
+      payload: { From: '+15550000001', Body: 'STOP' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('text/xml');
+    expect(res.body).toContain('<Response');
+    expect(res.body).not.toContain('<Message');
+  });
+
+  it('stays silent on HELP that Twilio already answered (Advanced Opt-Out)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/twilio/inbound',
+      payload: { From: '+15550000001', Body: 'HELP', OptOutType: 'HELP' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).not.toContain('<Message');
+  });
+
+  it('answers HELP itself when Twilio has not', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/twilio/inbound',
+      payload: { From: '+15550000001', Body: 'HELP' },
+    });
+    expect(res.body).toContain('<Message>Test Org: Reply with a group keyword to join.');
+  });
+
+  it('still replies to a keyword join', async () => {
+    await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/twilio/inbound',
+      payload: { From: '+15550000001', Body: 'DRAGON' },
+    });
+    expect(res.body).toContain("<Message>Test Org: You've joined Dragons.");
+  });
+
   it('broadcasts to subscribed members', async () => {
     const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
     const groupId = created.json().group.id;
