@@ -1,12 +1,5 @@
-import { Link } from 'react-router-dom';
 import { LegalLayout } from '@/components/LegalLayout';
-import {
-  ORGS,
-  PLATFORM_CONTACT_EMAIL,
-  PLATFORM_NAME,
-  PLATFORM_OPERATOR,
-  orgPath,
-} from '@/config/org';
+import { PLATFORM_CONTACT_EMAIL, PLATFORM_NAME, PLATFORM_OPERATOR } from '@/config/org';
 
 /**
  * Text Them's own Privacy Policy (/privacy), as opposed to each program's SMS
@@ -25,14 +18,7 @@ export function PlatformPrivacyPage() {
       </p>
       <p>
         Each program that uses {PLATFORM_NAME} also has its own privacy policy for the people who
-        receive its texts:{' '}
-        {ORGS.map((org, i) => (
-          <span key={org.slug}>
-            {i > 0 && ', '}
-            <Link to={orgPath(org, 'privacy')}>{org.name} Privacy Policy</Link>
-          </span>
-        ))}
-        .
+        receive its texts. You&rsquo;ll find it on the program&rsquo;s Join page.
       </p>
 
       <h2>Information We Collect</h2>

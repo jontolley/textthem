@@ -1,12 +1,6 @@
 import { Link } from 'react-router-dom';
 import { LegalLayout } from '@/components/LegalLayout';
-import {
-  ORGS,
-  PLATFORM_CONTACT_EMAIL,
-  PLATFORM_NAME,
-  PLATFORM_OPERATOR,
-  orgPath,
-} from '@/config/org';
+import { PLATFORM_CONTACT_EMAIL, PLATFORM_NAME, PLATFORM_OPERATOR } from '@/config/org';
 
 /**
  * Text Them's own Terms of Service (/terms) for organizers using the dashboard,
@@ -23,14 +17,7 @@ export function PlatformTermsPage() {
       </p>
       <p>
         If you receive texts from a program that uses {PLATFORM_NAME}, that program&rsquo;s own
-        messaging terms apply to you:{' '}
-        {ORGS.map((org, i) => (
-          <span key={org.slug}>
-            {i > 0 && ', '}
-            <Link to={orgPath(org, 'terms')}>{org.name} Terms</Link>
-          </span>
-        ))}
-        .
+        messaging terms apply to you. You&rsquo;ll find them on the program&rsquo;s Join page.
       </p>
 
       <h2>Who Can Use {PLATFORM_NAME}</h2>
