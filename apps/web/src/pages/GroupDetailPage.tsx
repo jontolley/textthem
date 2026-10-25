@@ -16,7 +16,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useBroadcast, useDeleteGroup, useGroup, useGroupMembers } from '@/lib/hooks';
+import type { BroadcastMessage } from '@text-them/shared';
+import {
+  useBroadcast,
+  useDeleteGroup,
+  useGroup,
+  useGroupMembers,
+  useMessages,
+} from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
 import { formatPhoneNumber } from '@/lib/phone';
@@ -31,6 +38,9 @@ export function GroupDetailPage() {
   const { data: memberLists } = useGroupMembers(id);
   const members = memberLists?.members;
   const leftGroup = memberLists?.unsubscribed ?? [];
+  const { data: messages } = useMessages();
+  // The API lists scheduled broadcasts soonest first.
+  const scheduled = messages?.filter((m) => m.groupId === id && m.status === 'scheduled') ?? [];
   const broadcast = useBroadcast(id);
   const deleteGroup = useDeleteGroup();
   const [body, setBody] = useState('');
@@ -173,6 +183,7 @@ export function GroupDetailPage() {
               </Button>
             </div>
           </form>
+          {scheduled.length > 0 && <ScheduledList messages={scheduled} />}
         </CardContent>
       </Card>
 
@@ -204,20 +215,18 @@ export function GroupDetailPage() {
         )}
       </CollapsibleCard>
 
-      {/* Collapsed by default: it's looked at now and then. */}
-      <CollapsibleCard
-        id="left-group-list"
-        title="Left the group"
-        count={leftGroup.length}
-        defaultOpen={false}
-      >
-        <p className="text-sm text-muted-foreground">
-          People who texted STOP. STOP takes them out of every group and they get no more texts. To
-          rejoin, they text START and then the group&rsquo;s keyword.
-        </p>
-        {leftGroup.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No one has left this group.</p>
-        ) : (
+      {/* Shown once someone has left. Collapsed by default: it's looked at now and then. */}
+      {leftGroup.length > 0 && (
+        <CollapsibleCard
+          id="left-group-list"
+          title="Left the group"
+          count={leftGroup.length}
+          defaultOpen={false}
+        >
+          <p className="text-sm text-muted-foreground">
+            People who texted STOP. STOP takes them out of every group and they get no more texts.
+            To rejoin, they text START and then the group&rsquo;s keyword.
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
@@ -240,14 +249,97 @@ export function GroupDetailPage() {
               ))}
             </TableBody>
           </Table>
-        )}
-      </CollapsibleCard>
+        </CollapsibleCard>
+      )}
     </div>
   );
 }
 
 function formatDate(iso: string | undefined): string {
   return iso ? new Date(iso).toLocaleDateString() : '—';
+}
+
+/** This group's broadcasts waiting to go out, under the send form. */
+function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="mt-6 space-y-3 border-t pt-4">
+      <h3 className="text-sm font-semibold">
+        <CollapsibleToggle
+          id="scheduled-list"
+          title="Scheduled"
+          count={messages.length}
+          open={open}
+          onToggle={() => setOpen((v) => !v)}
+        />
+      </h3>
+      {open && (
+        <div id="scheduled-list" className="space-y-3">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sends</TableHead>
+                <TableHead>Message</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {messages.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell className="whitespace-nowrap font-medium">
+                    {m.scheduledFor && formatDateTime(m.scheduledFor)}
+                  </TableCell>
+                  {/* Fills the space left and ends in "…" rather than widening the table. */}
+                  <TableCell className="w-full max-w-0 truncate">{m.body}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className="text-xs text-muted-foreground">
+            Edit or cancel them in{' '}
+            <Link to="/history" className="text-primary underline-offset-4 hover:underline">
+              History
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A section title that folds its contents away when clicked, with a count beside it. */
+function CollapsibleToggle({
+  id,
+  title,
+  count,
+  open,
+  onToggle,
+}: {
+  id: string;
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={id}
+      className="-m-1 flex w-full items-center gap-2 rounded-md p-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <ChevronDown
+        className={cn('h-4 w-4 shrink-0 transition-transform', !open && '-rotate-90')}
+        aria-hidden
+      />
+      {title}
+      <Badge variant="secondary" className="font-medium tabular-nums">
+        {count}
+      </Badge>
+    </button>
+  );
 }
 
 /** A card whose contents fold away behind its title, which shows a count. */
@@ -270,22 +362,13 @@ function CollapsibleCard({
     <Card>
       <CardHeader>
         <CardTitle>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-controls={id}
-            className="-m-1 flex w-full items-center gap-2 rounded-md p-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ChevronDown
-              className={cn('h-4 w-4 shrink-0 transition-transform', !open && '-rotate-90')}
-              aria-hidden
-            />
-            {title}
-            <Badge variant="secondary" className="font-medium tabular-nums">
-              {count}
-            </Badge>
-          </button>
+          <CollapsibleToggle
+            id={id}
+            title={title}
+            count={count}
+            open={open}
+            onToggle={() => setOpen((v) => !v)}
+          />
         </CardTitle>
       </CardHeader>
       {open && (
