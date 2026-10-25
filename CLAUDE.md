@@ -155,7 +155,7 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   `EventSource` can't send the Clerk token as a header. Each notice invalidates its
   topic's queries (`groups` covers a group's members too), and a reconnect
   invalidates everything. It retries with back-off and treats 60s of silence as a
-  dead connection. The header's `LiveIndicator` dot shows the state.
+  dead connection. It runs silently: there's no on-screen connection indicator.
 - Vite reads env from the **repo root** (`envDir` in `vite.config.ts`), so the one
   root `.env` serves both api and web; only `VITE_`-prefixed vars reach the client.
 

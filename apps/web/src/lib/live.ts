@@ -1,9 +1,6 @@
 import type { ChangeEvent, ChangeTopic } from '@text-them/shared';
 import { API_BASE_URL, type TokenGetter } from './api';
 
-/** `connecting` until the first stream opens; `reconnecting` after one drops. */
-export type LiveStatus = 'connecting' | 'live' | 'reconnecting';
-
 /** The API sends a heartbeat every 25s, so this long with nothing means the connection died. */
 const SILENCE_LIMIT_MS = 60_000;
 /** A stream that ends sooner than this counts as a failure, so a server that keeps ending them isn't hammered. */
@@ -16,7 +13,6 @@ export interface LiveUpdateHandlers {
   onChange(topic: ChangeTopic): void;
   /** After a dropped stream reconnects: notices may have been missed in between. */
   onReconnect(): void;
-  onStatus(status: LiveStatus): void;
 }
 
 /**
@@ -42,7 +38,6 @@ export async function runLiveUpdates(
           openedAt = Date.now();
           if (everConnected) handlers.onReconnect();
           everConnected = true;
-          handlers.onStatus('live');
         },
         onChange: handlers.onChange,
       });
@@ -51,7 +46,6 @@ export async function runLiveUpdates(
     } catch {
       if (signal.aborted) return;
       failures++;
-      handlers.onStatus(everConnected ? 'reconnecting' : 'connecting');
       await sleep(retryDelay(failures), signal);
     }
   }
