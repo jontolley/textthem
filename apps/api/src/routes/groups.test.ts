@@ -167,6 +167,44 @@ describe('groups API', () => {
     expect(res.body).toContain("<Message>Test Org: You've joined Dragons.");
   });
 
+  it('lists who left the group apart from current members, most recent first', async () => {
+    const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
+    const groupId = created.json().group.id;
+    const text = (From: string, Body: string) =>
+      app.inject({ method: 'POST', url: '/api/twilio/inbound', payload: { From, Body } });
+    const listMembers = async () =>
+      (await app.inject({ method: 'GET', url: `/api/groups/${groupId}/members` })).json();
+
+    for (const from of ['+15550000001', '+15550000002', '+15550000003']) {
+      await text(from, 'DRAGON');
+    }
+    await text('+15550000001', 'STOP');
+    await new Promise((resolve) => setTimeout(resolve, 5)); // so the two STOPs get distinct times
+    await text('+15550000003', 'STOP');
+
+    let res = await listMembers();
+    expect(res.members.map((m: { phoneNumber: string }) => m.phoneNumber)).toEqual([
+      '+15550000002',
+    ]);
+    expect(res.unsubscribed).toMatchObject([
+      { phoneNumber: '+15550000003', status: 'unsubscribed' },
+      { phoneNumber: '+15550000001', status: 'unsubscribed' },
+    ]);
+    expect(res.unsubscribed[0].unsubscribedAt).toEqual(expect.any(String));
+    expect(res.members[0].unsubscribedAt).toBeUndefined();
+
+    // Texting the keyword again moves them back.
+    await text('+15550000001', 'DRAGON');
+    res = await listMembers();
+    expect(res.members.map((m: { phoneNumber: string }) => m.phoneNumber).sort()).toEqual([
+      '+15550000001',
+      '+15550000002',
+    ]);
+    expect(res.unsubscribed.map((m: { phoneNumber: string }) => m.phoneNumber)).toEqual([
+      '+15550000003',
+    ]);
+  });
+
   it('broadcasts to subscribed members', async () => {
     const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
     const groupId = created.json().group.id;

@@ -38,11 +38,12 @@ export function useGroup(id: string) {
   });
 }
 
+/** A group's current members and the people who left it. */
 export function useGroupMembers(id: string) {
   const api = useApiClient();
   return useQuery({
     queryKey: ['groups', id, 'members'],
-    queryFn: () => api.listGroupMembers(id).then((r) => r.members),
+    queryFn: () => api.listGroupMembers(id),
   });
 }
 

@@ -43,12 +43,14 @@ export interface Subscription {
   unsubscribedAt?: string;
 }
 
-/** A subscribed member as returned by the group members endpoint. */
+/** A group's member (or former member) as returned by the group members endpoint. */
 export interface GroupMember {
   memberId: string;
   phoneNumber: string;
   status: SubscriptionStatus;
   subscribedAt?: string;
+  /** When they left (texted STOP); set only on unsubscribed members. */
+  unsubscribedAt?: string;
 }
 
 /**
@@ -142,7 +144,10 @@ export interface GroupResponse {
 }
 
 export interface ListGroupMembersResponse {
+  /** Currently subscribed: who a broadcast goes to. */
   members: GroupMember[];
+  /** People who left (texted STOP), most recent first. */
+  unsubscribed: GroupMember[];
 }
 
 export interface ListMessagesResponse {

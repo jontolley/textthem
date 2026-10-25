@@ -140,19 +140,26 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
       const group = await groups.findOne({ _id: id });
       if (!group) throw notFound('Group not found');
 
-      const subs = await subscriptions.find({ groupId: id, status: 'subscribed' }).toArray();
+      const subs = await subscriptions.find({ groupId: id }).toArray();
       const memberDocs = await members
         .find({ _id: { $in: subs.map((s) => s.memberId) } })
         .toArray();
       const phoneById = new Map(memberDocs.map((m) => [m._id.toHexString(), m.phoneNumber]));
 
-      const result: GroupMember[] = subs.map((s) => ({
+      const toMember = (s: (typeof subs)[number]): GroupMember => ({
         memberId: s.memberId.toHexString(),
         phoneNumber: phoneById.get(s.memberId.toHexString()) ?? '',
         status: s.status,
         subscribedAt: s.subscribedAt?.toISOString(),
-      }));
-      return { members: result };
+        unsubscribedAt: s.unsubscribedAt?.toISOString(),
+      });
+      const left = subs
+        .filter((s) => s.status === 'unsubscribed')
+        .sort((a, b) => (b.unsubscribedAt?.getTime() ?? 0) - (a.unsubscribedAt?.getTime() ?? 0));
+      return {
+        members: subs.filter((s) => s.status === 'subscribed').map(toMember),
+        unsubscribed: left.map(toMember),
+      };
     },
   );
 }

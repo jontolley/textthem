@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarClock, ChevronDown, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import {
 import { useBroadcast, useDeleteGroup, useGroup, useGroupMembers } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 
 const MAX_LENGTH = 1600;
 
@@ -25,7 +26,9 @@ export function GroupDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { data: group, isLoading } = useGroup(id);
-  const { data: members } = useGroupMembers(id);
+  const { data: memberLists } = useGroupMembers(id);
+  const members = memberLists?.members;
+  const leftGroup = memberLists?.unsubscribed ?? [];
   const broadcast = useBroadcast(id);
   const deleteGroup = useDeleteGroup();
   const [body, setBody] = useState('');
@@ -156,38 +159,123 @@ export function GroupDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Members</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {memberCount === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No subscribers yet. Share the keyword{' '}
-              <span className="font-mono font-medium">{group.keyword}</span> for people to text in.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Phone number</TableHead>
-                  <TableHead>Subscribed</TableHead>
+      <CollapsibleCard id="member-list" title="Members" count={memberCount} defaultOpen>
+        {memberCount === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No subscribers yet. Share the keyword{' '}
+            <span className="font-mono font-medium">{group.keyword}</span> for people to text in.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Phone number</TableHead>
+                <TableHead>Subscribed</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {members?.map((m) => (
+                <TableRow key={m.memberId}>
+                  <TableCell className="font-mono">{m.phoneNumber}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(m.subscribedAt)}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {members?.map((m) => (
-                  <TableRow key={m.memberId}>
-                    <TableCell className="font-mono">{m.phoneNumber}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {m.subscribedAt ? new Date(m.subscribedAt).toLocaleDateString() : '—'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CollapsibleCard>
+
+      {/* Collapsed by default: it's looked at now and then. */}
+      <CollapsibleCard
+        id="left-group-list"
+        title="Left the group"
+        count={leftGroup.length}
+        defaultOpen={false}
+      >
+        <p className="text-sm text-muted-foreground">
+          People who texted STOP. STOP takes them out of every group and they get no more texts. To
+          rejoin, they text START and then the group&rsquo;s keyword.
+        </p>
+        {leftGroup.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No one has left this group.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Phone number</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead>Left</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {leftGroup.map((m) => (
+                <TableRow key={m.memberId}>
+                  <TableCell className="font-mono">{m.phoneNumber}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(m.subscribedAt)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(m.unsubscribedAt)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CollapsibleCard>
     </div>
+  );
+}
+
+function formatDate(iso: string | undefined): string {
+  return iso ? new Date(iso).toLocaleDateString() : '—';
+}
+
+/** A card whose contents fold away behind its title, which shows a count. */
+function CollapsibleCard({
+  id,
+  title,
+  count,
+  defaultOpen,
+  children,
+}: {
+  id: string;
+  title: string;
+  count: number;
+  defaultOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-controls={id}
+            className="-m-1 flex w-full items-center gap-2 rounded-md p-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronDown
+              className={cn('h-4 w-4 shrink-0 transition-transform', !open && '-rotate-90')}
+              aria-hidden
+            />
+            {title}
+            <Badge variant="secondary" className="font-medium tabular-nums">
+              {count}
+            </Badge>
+          </button>
+        </CardTitle>
+      </CardHeader>
+      {open && (
+        <CardContent id={id} className="space-y-3">
+          {children}
+        </CardContent>
+      )}
+    </Card>
   );
 }
