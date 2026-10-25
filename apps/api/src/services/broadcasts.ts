@@ -101,12 +101,13 @@ export interface Scheduler {
 /**
  * Runs `runDueBroadcasts` now (to catch up after a restart) and then every
  * `intervalMs`. A pass that is still running when the next one is due is not
- * overlapped.
+ * overlapped. `onChange` runs after a pass that sent or marked anything.
  */
 export function startScheduler(
   deps: BroadcastDeps,
   intervalMs: number,
   log: FastifyBaseLogger,
+  onChange: () => void = () => {},
 ): Scheduler {
   let running: Promise<void> | null = null;
 
@@ -116,9 +117,13 @@ export function startScheduler(
       .then((result) => {
         if (result.sent || result.missed || result.interrupted) {
           log.info(result, 'Scheduled broadcasts processed');
+          onChange();
         }
       })
-      .catch((err) => log.error(err, 'Scheduled broadcast pass failed'))
+      .catch((err) => {
+        log.error(err, 'Scheduled broadcast pass failed');
+        onChange(); // it may have claimed or sent some before failing
+      })
       .finally(() => {
         running = null;
       });

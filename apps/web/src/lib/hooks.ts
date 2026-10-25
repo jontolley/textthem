@@ -1,17 +1,20 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryKey,
   type UseMutationResult,
 } from '@tanstack/react-query';
 import type {
+  ChangeTopic,
   CreateGroupRequest,
   UpdateGroupRequest,
   UpdateScheduledBroadcastRequest,
 } from '@text-them/shared';
 import { createApiClient, type ApiClient } from './api';
+import { runLiveUpdates, type LiveStatus } from './live';
 
 /** Builds an API client bound to the current Clerk session token. */
 export function useApiClient(): ApiClient {
@@ -69,6 +72,42 @@ export function useApiVersion() {
     queryFn: () => api.getVersion().then((r) => r.api),
     staleTime: 0,
   });
+}
+
+/** The cached queries each change topic covers (matched by key prefix, so a group's members too). */
+const TOPIC_QUERY_KEYS: Record<ChangeTopic, QueryKey> = {
+  groups: ['groups'],
+  messages: ['messages'],
+};
+
+/**
+ * Keeps the dashboard current without a refresh: refetches whatever the API's
+ * change stream says changed, and everything after a reconnect. Returns the
+ * stream's state for the Live dot. Mount it once, in the signed-in layout.
+ */
+export function useLiveUpdates(): LiveStatus {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  const [status, setStatus] = useState<LiveStatus>('connecting');
+  // Read through a ref so a new getToken identity doesn't reopen the stream.
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void runLiveUpdates(
+      () => getTokenRef.current(),
+      {
+        onChange: (topic) => qc.invalidateQueries({ queryKey: TOPIC_QUERY_KEYS[topic] }),
+        onReconnect: () => qc.invalidateQueries(),
+        onStatus: setStatus,
+      },
+      controller.signal,
+    );
+    return () => controller.abort();
+  }, [qc]);
+
+  return status;
 }
 
 export function useCreateGroup() {

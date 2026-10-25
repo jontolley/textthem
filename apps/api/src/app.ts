@@ -10,8 +10,10 @@ import { messageRoutes } from './routes/messages.js';
 import { STATUS_CALLBACK_PATH, twilioRoutes } from './routes/twilio.js';
 import { meRoutes } from './routes/me.js';
 import { versionRoutes } from './routes/version.js';
+import { eventRoutes, type EventRoutesOptions } from './routes/events.js';
 import { HttpError } from './errors.js';
 import { startScheduler, type Scheduler } from './services/broadcasts.js';
+import { createChangeNotifier, type ChangeNotifier } from './services/events.js';
 import type { TwilioService } from './services/twilio.js';
 import type { AppConfig } from './config.js';
 
@@ -27,6 +29,10 @@ export interface BuildAppOptions {
    * tests, which run the scheduler pass directly.
    */
   schedulerIntervalMs?: number;
+  /** Override the live-update notifier (tests inject one without throttling). */
+  events?: ChangeNotifier;
+  /** Override the live-update stream's timings (tests shorten them). */
+  eventStream?: EventRoutesOptions;
   fastifyOptions?: FastifyServerOptions;
 }
 
@@ -70,6 +76,11 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
       : { uri: config.MONGODB_URI, dbName: config.MONGODB_DB_NAME },
   );
 
+  // Routes and the scheduler announce changes here; open dashboards hear them.
+  const events = opts.events ?? createChangeNotifier();
+  app.decorate('events', events);
+  app.addHook('onClose', async () => events.close());
+
   // A custom authenticator (tests) bypasses Clerk entirely.
   const usingClerk = !opts.authenticator;
   await app.register(authPlugin, {
@@ -101,6 +112,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     await scope.register(messageRoutes, { twilio: opts.twilio, statusCallbackUrl });
     await scope.register(versionRoutes, { commit: config.GIT_SHA, builtAt: config.BUILT_AT });
     await scope.register(meRoutes);
+    await scope.register(eventRoutes, opts.eventStream ?? {});
   });
 
   // ─── Scheduled broadcasts ───────────────────────────────────────────
@@ -112,6 +124,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
         { collections: app.mongo.collections, twilio: opts.twilio, statusCallbackUrl },
         schedulerIntervalMs,
         app.log,
+        () => events.notify('messages'),
       );
     });
     // Let a pass in progress finish before the database connection closes.

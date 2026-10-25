@@ -21,6 +21,13 @@ primary_region = "iad"
   auto_start_machines = true
   min_machines_running = 1
 
+  # Each open dashboard holds a live-update stream (GET /api/events) open, so
+  # count requests rather than connections and leave room for Twilio's webhooks.
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
   [[http_service.checks]]
     interval = "15s"
     timeout = "2s"

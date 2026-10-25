@@ -166,6 +166,18 @@ export interface MeResponse {
   userId: string;
 }
 
+/**
+ * What changed, as announced on the live-update stream (`GET /api/events`).
+ * `groups` covers groups, their members, and member counts; `messages` covers
+ * broadcasts, their status, and delivery counts.
+ */
+export type ChangeTopic = 'groups' | 'messages';
+
+/** One live-update notice. It carries no data: the dashboard refetches the topic. */
+export interface ChangeEvent {
+  topic: ChangeTopic;
+}
+
 export interface ApiError {
   error: string;
   message: string;

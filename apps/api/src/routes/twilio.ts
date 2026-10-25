@@ -78,6 +78,8 @@ export async function twilioRoutes(
       receivedAt: new Date(),
     };
     await collections.inboundMessages.insertOne(log);
+    // Joining or STOP changes who's in a group (HELP, START and the rest don't).
+    if (result.action === 'join' || result.action === 'stop') fastify.events.notify('groups');
 
     const twiml = new twilio.twiml.MessagingResponse();
     // Twilio asks apps not to reply again to a keyword its opt-out handling answered.
@@ -103,7 +105,9 @@ export async function twilioRoutes(
       status: MessageStatus,
       errorCode: ErrorCode || undefined,
     });
-    if (!recorded) {
+    if (recorded) {
+      fastify.events.notify('messages'); // History's delivery counts
+    } else {
       fastify.log.warn({ status: MessageStatus }, 'Ignored unrecognized Twilio message status');
     }
     return reply.code(204).send();

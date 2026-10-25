@@ -11,7 +11,7 @@ import type {
   VersionResponse,
 } from '@text-them/shared';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
 export type TokenGetter = () => Promise<string | null>;
 

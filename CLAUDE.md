@@ -95,6 +95,20 @@ stubs (see `src/routes/groups.test.ts`).
   `deliveries` doc per Message SID; callbacks only move a status forward (they
   repeat and arrive out of order), and History's delivered/undelivered counts are
   aggregated from those docs at read time.
+- **Live updates.** `GET /api/events` (`src/routes/events.ts`, Clerk-protected) is a
+  Server-Sent Events stream of change notices: `{"topic":"groups"}` or
+  `{"topic":"messages"}`, never data. The dashboard refetches the topic through the
+  normal endpoints.
+  - Anything that changes groups, members, broadcasts or delivery counts calls
+    `fastify.events.notify(topic)` (`src/services/events.ts`). That covers the
+    routes, both Twilio webhooks, and the scheduler's `onChange`. A new write path
+    needs the same call, or open dashboards won't see it.
+  - Each topic goes out at most once a second; a burst folds into one more notice
+    at the end. The stream sends a heartbeat every 25s and ends after 15 minutes
+    so the client reconnects and re-auths. Open streams are ended on shutdown.
+  - The notifier is in memory, so it relies on the single Fly machine. More
+    machines would need MongoDB change streams. `fly.toml` counts concurrency by
+    requests, since every open dashboard holds one.
 
 ### Data model
 Collections: `groups`, `members`, `subscriptions` (the opt-in audit trail with
@@ -136,6 +150,12 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   SVGs, then rerun it.
 - **API access**: `src/lib/api.ts` `createApiClient(getToken)` attaches the Clerk
   JWT to every request; `src/lib/hooks.ts` wraps it in TanStack Query hooks.
+- **Live updates**: `useLiveUpdates()` (mounted once, in `Layout`) keeps the API's
+  `/api/events` stream open via `src/lib/live.ts`. It reads with fetch, because
+  `EventSource` can't send the Clerk token as a header. Each notice invalidates its
+  topic's queries (`groups` covers a group's members too), and a reconnect
+  invalidates everything. It retries with back-off and treats 60s of silence as a
+  dead connection. The header's `LiveIndicator` dot shows the state.
 - Vite reads env from the **repo root** (`envDir` in `vite.config.ts`), so the one
   root `.env` serves both api and web; only `VITE_`-prefixed vars reach the client.
 

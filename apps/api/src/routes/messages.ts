@@ -69,7 +69,10 @@ export async function messageRoutes(
       { $set: update },
       { returnDocument: 'after' },
     );
-    if (updated) return updated;
+    if (updated) {
+      fastify.events.notify('messages');
+      return updated;
+    }
     if (await messages.countDocuments({ _id: id })) {
       throw conflict("This broadcast is no longer scheduled, so it can't be changed");
     }
@@ -99,6 +102,7 @@ export async function messageRoutes(
       };
       // Recorded before any text goes out, so a crash mid-send leaves a trace.
       await messages.insertOne(doc);
+      fastify.events.notify('messages');
 
       const result = sendAt
         ? doc
@@ -106,6 +110,7 @@ export async function messageRoutes(
             { collections, twilio: deps.twilio, statusCallbackUrl: deps.statusCallbackUrl },
             doc,
           );
+      if (!sendAt) fastify.events.notify('messages');
       reply.code(201);
       return respond(result);
     },

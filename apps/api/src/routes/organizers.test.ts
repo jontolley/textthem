@@ -48,7 +48,7 @@ describe('organizer allowlist', () => {
     expect(res.json()).toEqual({ userId: 'user_b' });
   });
 
-  it.each(['/api/me', '/api/groups', '/api/messages', '/api/version'])(
+  it.each(['/api/me', '/api/groups', '/api/messages', '/api/version', '/api/events'])(
     'refuses a signed-in non-organizer on %s with 403',
     async (url) => {
       const res = await request('user_a', 'user_intruder', url);

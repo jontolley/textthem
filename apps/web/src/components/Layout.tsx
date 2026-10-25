@@ -1,6 +1,8 @@
 import { UserButton } from '@clerk/clerk-react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { AppIcon } from '@/components/AppIcon';
+import { LiveIndicator } from '@/components/LiveIndicator';
+import { useLiveUpdates } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 
 // Links sit on the green header bar; the active one is underlined in white.
@@ -12,6 +14,8 @@ function navClass({ isActive }: { isActive: boolean }) {
 }
 
 export function Layout() {
+  const liveStatus = useLiveUpdates();
+
   return (
     <div className="min-h-screen bg-muted/20">
       <header className="bg-primary text-primary-foreground">
@@ -33,7 +37,10 @@ export function Layout() {
               </NavLink>
             </nav>
           </div>
-          <UserButton />
+          <div className="flex items-center gap-4">
+            <LiveIndicator status={liveStatus} />
+            <UserButton />
+          </div>
         </div>
       </header>
       <main className="container py-8">

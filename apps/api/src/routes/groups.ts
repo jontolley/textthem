@@ -92,6 +92,7 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
       if (isDuplicateKeyError(err)) throw conflict(`Keyword "${input.keyword}" is already in use`);
       throw err;
     }
+    fastify.events.notify('groups');
     reply.code(201);
     return { group: serializeGroup(doc, 0) };
   });
@@ -110,6 +111,7 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
           { returnDocument: 'after' },
         );
         if (!updated) throw notFound('Group not found');
+        fastify.events.notify('groups');
         const counts = await subscribedCounts(fastify, [id]);
         return { group: serializeGroup(updated, counts.get(id.toHexString()) ?? 0) };
       } catch (err) {
@@ -126,6 +128,8 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     await subscriptions.deleteMany({ groupId: id });
     // Nothing left to send them to.
     await messages.updateMany({ groupId: id, status: 'scheduled' }, { $set: { status: 'canceled' } });
+    fastify.events.notify('groups');
+    fastify.events.notify('messages');
     reply.code(204);
   });
 
