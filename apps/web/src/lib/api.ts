@@ -30,7 +30,8 @@ export function createApiClient(getToken: TokenGetter) {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       headers: {
-        'Content-Type': 'application/json',
+        // Only with a body: Fastify rejects an empty body sent as JSON.
+        ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init.headers,
       },
