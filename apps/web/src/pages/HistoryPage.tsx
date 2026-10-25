@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CalendarClock, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BroadcastMessage } from '@text-them/shared';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -192,9 +193,9 @@ function ScheduledCard({
 }) {
   const cancel = useCancelScheduledBroadcast();
   const [editing, setEditing] = useState<BroadcastMessage | null>(null);
+  const [canceling, setCanceling] = useState<BroadcastMessage | null>(null);
 
   async function handleCancel(m: BroadcastMessage) {
-    if (!confirm('Cancel this scheduled broadcast? It will not be sent.')) return;
     try {
       await cancel.mutateAsync(m.id);
       toast.success('Scheduled broadcast canceled');
@@ -235,7 +236,7 @@ function ScheduledCard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleCancel(m)}
+                    onClick={() => setCanceling(m)}
                     disabled={cancel.isPending}
                   >
                     <X className="h-4 w-4" /> Cancel
@@ -251,6 +252,20 @@ function ScheduledCard({
           key={editing.id}
           message={editing}
           onOpenChange={(open) => !open && setEditing(null)}
+        />
+      )}
+      {canceling && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && setCanceling(null)}
+          title="Cancel this scheduled broadcast?"
+          description={`It won't be sent to ${groupName(canceling.groupId)}${
+            canceling.scheduledFor ? ` on ${formatDateTime(canceling.scheduledFor)}` : ''
+          }. This can't be undone.`}
+          confirmLabel="Cancel broadcast"
+          pendingLabel="Canceling…"
+          cancelLabel="Keep it"
+          onConfirm={() => handleCancel(canceling)}
         />
       )}
     </Card>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarClock, ChevronDown, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ import {
 import { useBroadcast, useDeleteGroup, useGroup, useGroupMembers } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
+import { formatPhoneNumber } from '@/lib/phone';
 import { cn } from '@/lib/utils';
 
 const MAX_LENGTH = 1600;
@@ -33,6 +35,7 @@ export function GroupDetailPage() {
   const deleteGroup = useDeleteGroup();
   const [body, setBody] = useState('');
   const [scheduleLater, setScheduleLater] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Local wall-clock time from the datetime-local input, e.g. "2026-10-25T09:00".
   const [sendAt, setSendAt] = useState(() => toLocalInputValue(defaultSendTime()));
 
@@ -58,7 +61,6 @@ export function GroupDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${group?.name}"? This removes the group and its subscriptions.`)) return;
     try {
       await deleteGroup.mutateAsync(id);
       toast.success('Group deleted');
@@ -90,10 +92,25 @@ export function GroupDetailPage() {
             subscribed
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleDelete} disabled={deleteGroup.isPending}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setConfirmingDelete(true)}
+          disabled={deleteGroup.isPending}
+        >
           <Trash2 className="h-4 w-4" /> Delete
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`Delete "${group.name}"?`}
+        description="This deletes the group and its record of who joined and left. Its members stay in their other groups. This can't be undone."
+        confirmLabel="Delete group"
+        pendingLabel="Deleting…"
+        onConfirm={handleDelete}
+      />
 
       <Card>
         <CardHeader>
@@ -176,7 +193,7 @@ export function GroupDetailPage() {
             <TableBody>
               {members?.map((m) => (
                 <TableRow key={m.memberId}>
-                  <TableCell className="font-mono">{m.phoneNumber}</TableCell>
+                  <TableCell className="tabular-nums">{formatPhoneNumber(m.phoneNumber)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDate(m.subscribedAt)}
                   </TableCell>
@@ -212,7 +229,7 @@ export function GroupDetailPage() {
             <TableBody>
               {leftGroup.map((m) => (
                 <TableRow key={m.memberId}>
-                  <TableCell className="font-mono">{m.phoneNumber}</TableCell>
+                  <TableCell className="tabular-nums">{formatPhoneNumber(m.phoneNumber)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDate(m.subscribedAt)}
                   </TableCell>
