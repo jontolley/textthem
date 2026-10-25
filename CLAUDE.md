@@ -96,10 +96,10 @@ stubs (see `src/routes/groups.test.ts`).
   repeat and arrive out of order), and History's delivered/undelivered counts are
   aggregated from those docs at read time.
 - **Live updates.** `GET /api/events` (`src/routes/events.ts`, Clerk-protected) is a
-  Server-Sent Events stream of change notices: `{"topic":"groups"}` or
-  `{"topic":"messages"}`, never data. The dashboard refetches the topic through the
-  normal endpoints.
-  - Anything that changes groups, members, broadcasts or delivery counts calls
+  Server-Sent Events stream of change notices: `{"topic":"groups"}`,
+  `{"topic":"messages"}` or `{"topic":"inbound"}`, never data. The dashboard
+  refetches the topic through the normal endpoints.
+  - Anything that changes groups, members, broadcasts, delivery counts or received texts calls
     `fastify.events.notify(topic)` (`src/services/events.ts`). That covers the
     routes, both Twilio webhooks, and the scheduler's `onChange`. A new write path
     needs the same call, or open dashboards won't see it.
@@ -114,7 +114,7 @@ stubs (see `src/routes/groups.test.ts`).
 Collections: `groups`, `members`, `subscriptions` (the opt-in audit trail with
 status + timestamps), `messages` (broadcasts, including scheduled ones: `status` is
 scheduled/sending/sent/canceled/missed/interrupted, absent = sent), `deliveries` (per-recipient
-Twilio status of each broadcast send), `inbound_messages` (every received SMS). Indexes are created on boot in `src/db/index.ts` (`ensureIndexes`):
+Twilio status of each broadcast send), `inbound_messages` (every received SMS; the dashboard's Replies page lists them via `GET /api/inbound-messages`, with each sender's current groups). Indexes are created on boot in `src/db/index.ts` (`ensureIndexes`):
 unique on `groups.keyword`, `members.phoneNumber`, and `deliveries.twilioSid`, unique compound
 `{memberId, groupId}` on subscriptions. The database name is **`textthem`**
 (`MONGODB_DB_NAME`), the same in local and production.

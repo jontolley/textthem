@@ -3,6 +3,7 @@ import type {
   CreateGroupRequest,
   GroupResponse,
   ListGroupMembersResponse,
+  ListInboundMessagesResponse,
   ListGroupsResponse,
   ListMessagesResponse,
   MeResponse,
@@ -76,6 +77,7 @@ export function createApiClient(getToken: TokenGetter) {
       }),
     cancelScheduledBroadcast: (id: string) =>
       request<BroadcastResponse>(`/api/messages/${id}/cancel`, { method: 'POST' }),
+    listInboundMessages: () => request<ListInboundMessagesResponse>('/api/inbound-messages'),
     getVersion: () => request<VersionResponse>('/api/version'),
     getMe: () => request<MeResponse>('/api/me'),
   };

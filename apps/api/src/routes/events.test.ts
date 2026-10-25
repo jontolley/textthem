@@ -273,13 +273,13 @@ describe('change notices', () => {
     ).toEqual(['groups', 'messages']);
   });
 
-  it('announces groups when someone joins or texts STOP, but not for HELP or START', async () => {
+  it('announces every text received, and groups when someone joins or texts STOP', async () => {
     await insertGroup('DRAGON');
-    expect(await topicsFrom(() => textIn('+15550000001', 'DRAGON'))).toEqual(['groups']);
-    expect(await topicsFrom(() => textIn('+15550000001', 'STOP'))).toEqual(['groups']);
-    expect(await topicsFrom(() => textIn('+15550000001', 'HELP'))).toEqual([]);
-    expect(await topicsFrom(() => textIn('+15550000001', 'START'))).toEqual([]);
-    expect(await topicsFrom(() => textIn('+15550000001', 'NOPE'))).toEqual([]);
+    expect(await topicsFrom(() => textIn('+15550000001', 'DRAGON'))).toEqual(['groups', 'inbound']);
+    expect(await topicsFrom(() => textIn('+15550000001', 'STOP'))).toEqual(['groups', 'inbound']);
+    expect(await topicsFrom(() => textIn('+15550000001', 'HELP'))).toEqual(['inbound']);
+    expect(await topicsFrom(() => textIn('+15550000001', 'START'))).toEqual(['inbound']);
+    expect(await topicsFrom(() => textIn('+15550000001', 'NOPE'))).toEqual(['inbound']);
   });
 
   it('announces messages when a broadcast is sent, scheduled, edited, or canceled', async () => {

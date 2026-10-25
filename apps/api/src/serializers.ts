@@ -1,5 +1,5 @@
-import type { Group, BroadcastMessage, DeliveryStats } from '@text-them/shared';
-import type { GroupDoc, MessageDoc } from './db/documents.js';
+import type { Group, BroadcastMessage, DeliveryStats, InboundMessage } from '@text-them/shared';
+import type { GroupDoc, InboundMessageDoc, MessageDoc } from './db/documents.js';
 
 export function serializeGroup(doc: GroupDoc, memberCount?: number): Group {
   return {
@@ -27,5 +27,20 @@ export function serializeMessage(doc: MessageDoc, delivery?: DeliveryStats): Bro
     failedCount: doc.failedCount,
     delivery,
     sentAt: doc.sentAt?.toISOString(),
+  };
+}
+
+export function serializeInboundMessage(
+  doc: InboundMessageDoc,
+  groupIds: string[],
+): InboundMessage {
+  return {
+    id: doc._id.toHexString(),
+    fromNumber: doc.fromNumber,
+    body: doc.body,
+    action: doc.action,
+    matchedKeyword: doc.matchedKeyword,
+    groupIds,
+    receivedAt: doc.receivedAt.toISOString(),
   };
 }

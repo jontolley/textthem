@@ -22,7 +22,8 @@ export function Layout() {
           <div className="flex items-center gap-4 sm:gap-6">
             <Link to="/" className="flex items-center gap-2 font-semibold">
               <AppIcon />
-              Text Them
+              {/* Phones only have room for the icon beside four nav links. */}
+              <span className="sr-only sm:not-sr-only">Text Them</span>
             </Link>
             <nav className="flex items-center gap-4">
               <NavLink to="/" end className={navClass}>
@@ -30,6 +31,9 @@ export function Layout() {
               </NavLink>
               <NavLink to="/history" className={navClass}>
                 History
+              </NavLink>
+              <NavLink to="/replies" className={navClass}>
+                Replies
               </NavLink>
               <NavLink to="/help" className={navClass}>
                 Help

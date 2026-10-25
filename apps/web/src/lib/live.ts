@@ -7,7 +7,7 @@ const SILENCE_LIMIT_MS = 60_000;
 const MIN_HEALTHY_STREAM_MS = 5_000;
 const MAX_RETRY_DELAY_MS = 30_000;
 
-const TOPICS: readonly ChangeTopic[] = ['groups', 'messages'];
+const TOPICS: readonly ChangeTopic[] = ['groups', 'messages', 'inbound'];
 
 export interface LiveUpdateHandlers {
   onChange(topic: ChangeTopic): void;

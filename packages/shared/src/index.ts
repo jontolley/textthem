@@ -108,6 +108,21 @@ export interface BroadcastMessage {
   sentAt?: string;
 }
 
+/** A text someone sent to the org's number, as shown on the dashboard's Replies page. */
+export interface InboundMessage {
+  id: string;
+  /** E.164 sender. */
+  fromNumber: string;
+  body: string;
+  /** What the text did: joined a group, opted out, asked for help, or nothing ('unknown'). */
+  action: InboundAction;
+  /** The group keyword it matched, for joins. */
+  matchedKeyword?: string;
+  /** Groups the sender is subscribed to now (not when they texted). */
+  groupIds: string[];
+  receivedAt: string;
+}
+
 // ─── API request/response DTOs ────────────────────────────────────────
 
 export interface CreateGroupRequest {
@@ -154,6 +169,11 @@ export interface ListMessagesResponse {
   messages: BroadcastMessage[];
 }
 
+export interface ListInboundMessagesResponse {
+  /** Most recent first. */
+  messages: InboundMessage[];
+}
+
 /** Which build is running. Null fields mean a local/dev build that wasn't stamped. */
 export interface VersionInfo {
   /** Full git commit SHA the build came from. */
@@ -174,9 +194,10 @@ export interface MeResponse {
 /**
  * What changed, as announced on the live-update stream (`GET /api/events`).
  * `groups` covers groups, their members, and member counts; `messages` covers
- * broadcasts, their status, and delivery counts.
+ * broadcasts, their status, and delivery counts; `inbound` covers texts
+ * received.
  */
-export type ChangeTopic = 'groups' | 'messages';
+export type ChangeTopic = 'groups' | 'messages' | 'inbound';
 
 /** One live-update notice. It carries no data: the dashboard refetches the topic. */
 export interface ChangeEvent {

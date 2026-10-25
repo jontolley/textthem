@@ -141,6 +141,26 @@ export function HelpPage() {
         </ul>
       </Section>
 
+      <Section title="Replies">
+        <ul>
+          <li>
+            When someone texts something that isn&apos;t a keyword, the text shows up in{' '}
+            <strong>Replies</strong> and they get an automatic reply:
+            <ul>
+              <li>Members of a group are told texts to this number aren&apos;t actively read.</li>
+              <li>
+                Anyone else is told the keyword wasn&apos;t recognized, with the list of keywords.
+              </li>
+            </ul>
+          </li>
+          <li>Nobody is notified when one arrives, so check it now and then.</li>
+          <li>
+            <strong>All texts</strong> also shows keywords, STOP, and HELP, so you can see
+            everything the number received.
+          </li>
+        </ul>
+      </Section>
+
       <Section title="Scheduled broadcasts">
         <ul>
           <li>Times are in your time zone. It sends within about 30 seconds of the time you set.</li>

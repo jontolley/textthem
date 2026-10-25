@@ -127,9 +127,39 @@ describe('processInbound', () => {
     expect(result.reply).toContain('Contact help@example.org.');
   });
 
-  it('returns unknown for unrecognized keyword', async () => {
+  it('lists the active keywords when someone in no group texts something else', async () => {
+    await seedGroup();
+    await seedGroup({ name: 'Tigers', keyword: 'TIGER' });
+    await seedGroup({ name: 'Old', keyword: 'OLD', active: false });
+    const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'DRAGN');
+    expect(result.action).toBe('unknown');
+    expect(result.reply).toBe(
+      'Test Org: Keyword not recognized. Text one of these to join: DRAGON, TIGER. Reply HELP for help or STOP to opt out.',
+    );
+  });
+
+  it('says there is nothing to join when there are no active groups', async () => {
     const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'NOPE');
     expect(result.action).toBe('unknown');
+    expect(result.reply).toContain('There are no groups to join right now.');
+  });
+
+  it("tells a member their texts aren't read", async () => {
+    await seedGroup();
+    await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'DRAGON');
+    const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'See you Saturday!');
+    expect(result.action).toBe('unknown');
+    expect(result.reply).toBe(
+      "Test Org: Texts to this number aren't actively read. Reply HELP for help or STOP to opt out.",
+    );
+  });
+
+  it('treats someone who left every group as not a member', async () => {
+    await seedGroup();
+    await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'DRAGON');
+    await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'STOP');
+    const result = await processInbound({ collections: database.collections, orgName: ORG }, PHONE, 'Hello?');
+    expect(result.reply).toContain('Keyword not recognized.');
   });
 
   it('does not subscribe to an inactive group', async () => {

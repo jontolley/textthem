@@ -7,6 +7,7 @@ import { databasePlugin, type Database } from './db/index.js';
 import { authPlugin, clerkAuthenticator, type Authenticator } from './plugins/auth.js';
 import { groupRoutes } from './routes/groups.js';
 import { messageRoutes } from './routes/messages.js';
+import { inboundRoutes } from './routes/inbound.js';
 import { STATUS_CALLBACK_PATH, twilioRoutes } from './routes/twilio.js';
 import { meRoutes } from './routes/me.js';
 import { versionRoutes } from './routes/version.js';
@@ -110,6 +111,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     }
     await scope.register(groupRoutes);
     await scope.register(messageRoutes, { twilio: opts.twilio, statusCallbackUrl });
+    await scope.register(inboundRoutes);
     await scope.register(versionRoutes, { commit: config.GIT_SHA, builtAt: config.BUILT_AT });
     await scope.register(meRoutes);
     await scope.register(eventRoutes, opts.eventStream ?? {});

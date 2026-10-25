@@ -55,6 +55,15 @@ export function useMessages() {
   });
 }
 
+/** Texts people sent to the org's number, most recent first. */
+export function useInboundMessages() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['inbound'],
+    queryFn: () => api.listInboundMessages().then((r) => r.messages),
+  });
+}
+
 /** The signed-in organizer. A 403 means this account isn't an organizer. */
 export function useMe() {
   const api = useApiClient();
@@ -79,6 +88,7 @@ export function useApiVersion() {
 const TOPIC_QUERY_KEYS: Record<ChangeTopic, QueryKey> = {
   groups: ['groups'],
   messages: ['messages'],
+  inbound: ['inbound'],
 };
 
 /**

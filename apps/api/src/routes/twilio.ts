@@ -80,6 +80,7 @@ export async function twilioRoutes(
     await collections.inboundMessages.insertOne(log);
     // Joining or STOP changes who's in a group (HELP, START and the rest don't).
     if (result.action === 'join' || result.action === 'stop') fastify.events.notify('groups');
+    fastify.events.notify('inbound'); // the Replies page
 
     const twiml = new twilio.twiml.MessagingResponse();
     // Twilio asks apps not to reply again to a keyword its opt-out handling answered.

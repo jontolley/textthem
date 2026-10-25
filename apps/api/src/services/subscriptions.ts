@@ -104,8 +104,41 @@ export async function processInbound(
     };
   }
 
-  return {
-    action: 'unknown',
-    reply: `Sorry, we didn't recognize that keyword. Reply HELP for help.`,
-  };
+  return { action: 'unknown', reply: await unknownReply(collections, orgName, fromNumber) };
+}
+
+/**
+ * Members get told their texts aren't read (they show up on the dashboard's
+ * Replies page, but nobody is notified). Anyone in no group most likely
+ * mistyped a keyword, so they get the keywords they can text.
+ * Keep the apostrophes straight: a curly one makes the text UCS-2, which cuts
+ * one SMS from 160 characters to 70.
+ */
+async function unknownReply(
+  collections: Collections,
+  orgName: string,
+  fromNumber: string,
+): Promise<string> {
+  const member = await collections.members.findOne({ phoneNumber: fromNumber });
+  const inAGroup =
+    member !== null &&
+    (await collections.subscriptions.countDocuments(
+      { memberId: member._id, status: 'subscribed' },
+      { limit: 1 },
+    )) > 0;
+  if (inAGroup) {
+    return `${orgName}: Texts to this number aren't actively read. Reply HELP for help or STOP to opt out.`;
+  }
+
+  const keywords = (
+    await collections.groups
+      .find({ active: true }, { projection: { keyword: 1 } })
+      .sort({ keyword: 1 })
+      .toArray()
+  ).map((g) => g.keyword);
+  const options =
+    keywords.length > 0
+      ? ` Text one of these to join: ${keywords.join(', ')}.`
+      : ' There are no groups to join right now.';
+  return `${orgName}: Keyword not recognized.${options} Reply HELP for help or STOP to opt out.`;
 }
