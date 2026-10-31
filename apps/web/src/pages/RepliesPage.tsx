@@ -110,9 +110,19 @@ export function RepliesPage() {
                   <li key={m.id} className="space-y-1 py-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                       <div className="text-sm">
-                        <span className="font-medium tabular-nums">
-                          {formatPhoneNumber(m.fromNumber)}
-                        </span>
+                        {/* A named sender leads with the name; the number steps back to gray. */}
+                        {m.fromName ? (
+                          <>
+                            <span className="font-medium">{m.fromName}</span>{' '}
+                            <span className="tabular-nums text-muted-foreground">
+                              {formatPhoneNumber(m.fromNumber)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="font-medium tabular-nums">
+                            {formatPhoneNumber(m.fromNumber)}
+                          </span>
+                        )}
                         <span className="text-muted-foreground">
                           {' · '}
                           <SenderGroups groups={groupsOf(m)} />

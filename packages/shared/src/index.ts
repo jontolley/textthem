@@ -116,6 +116,8 @@ export interface InboundMessage {
   id: string;
   /** E.164 sender. */
   fromNumber: string;
+  /** The sender's member name, if an organizer gave them one. */
+  fromName?: string;
   body: string;
   /** What the text did: joined a group, opted out, asked for help, or nothing ('unknown'). */
   action: InboundAction;

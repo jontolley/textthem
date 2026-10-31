@@ -143,4 +143,20 @@ describe('inbound messages API', () => {
       true,
     );
   });
+
+  it("shows the sender's member name once an organizer sets one", async () => {
+    await insertGroup('DRAGON');
+    await textIn(A, 'DRAGON');
+    await textIn(B, 'Who is this?');
+    const member = await database.collections.members.findOne({ phoneNumber: A });
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/members/${member!._id.toHexString()}`,
+      payload: { name: 'Ada' },
+    });
+
+    const messages = await listInbound();
+    expect(messages.find((m) => m.fromNumber === A)?.fromName).toBe('Ada');
+    expect(messages.find((m) => m.fromNumber === B)?.fromName).toBeUndefined();
+  });
 });

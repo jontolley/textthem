@@ -10,7 +10,7 @@ export async function inboundRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.addHook('preHandler', fastify.requireAuth);
 
-  // The latest texts, each with the groups its sender is in now.
+  // The latest texts, each with its sender's name and the groups they're in now.
   fastify.get('/api/inbound-messages', async (): Promise<ListInboundMessagesResponse> => {
     const docs = await inboundMessages
       .find()
@@ -29,14 +29,17 @@ export async function inboundRoutes(fastify: FastifyInstance): Promise<void> {
       const key = s.memberId.toHexString();
       groupIdsByMember.set(key, [...(groupIdsByMember.get(key) ?? []), s.groupId.toHexString()]);
     }
-    const groupIdsByPhone = new Map(
-      senders.map((m) => [m.phoneNumber, groupIdsByMember.get(m._id.toHexString()) ?? []]),
-    );
+    const senderByPhone = new Map(senders.map((m) => [m.phoneNumber, m]));
 
     return {
-      messages: docs.map((d) =>
-        serializeInboundMessage(d, groupIdsByPhone.get(d.fromNumber) ?? []),
-      ),
+      messages: docs.map((d) => {
+        const sender = senderByPhone.get(d.fromNumber);
+        return serializeInboundMessage(
+          d,
+          (sender && groupIdsByMember.get(sender._id.toHexString())) ?? [],
+          sender?.name,
+        );
+      }),
     };
   });
 }

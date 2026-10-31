@@ -48,10 +48,12 @@ export function serializeMessage(doc: MessageDoc, delivery?: DeliveryStats): Bro
 export function serializeInboundMessage(
   doc: InboundMessageDoc,
   groupIds: string[],
+  fromName?: string,
 ): InboundMessage {
   return {
     id: doc._id.toHexString(),
     fromNumber: doc.fromNumber,
+    fromName,
     body: doc.body,
     action: doc.action,
     matchedKeyword: doc.matchedKeyword,
