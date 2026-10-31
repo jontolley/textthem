@@ -144,11 +144,12 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
       const memberDocs = await members
         .find({ _id: { $in: subs.map((s) => s.memberId) } })
         .toArray();
-      const phoneById = new Map(memberDocs.map((m) => [m._id.toHexString(), m.phoneNumber]));
+      const memberById = new Map(memberDocs.map((m) => [m._id.toHexString(), m]));
 
       const toMember = (s: (typeof subs)[number]): GroupMember => ({
         memberId: s.memberId.toHexString(),
-        phoneNumber: phoneById.get(s.memberId.toHexString()) ?? '',
+        phoneNumber: memberById.get(s.memberId.toHexString())?.phoneNumber ?? '',
+        name: memberById.get(s.memberId.toHexString())?.name,
         status: s.status,
         subscribedAt: s.subscribedAt?.toISOString(),
         unsubscribedAt: s.unsubscribedAt?.toISOString(),

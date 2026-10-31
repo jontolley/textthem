@@ -167,6 +167,39 @@ describe('groups API', () => {
     expect(res.body).toContain("<Message>Test Org: You've joined Dragons.");
   });
 
+  it('names a member, shows the name in their groups, and clears it when empty', async () => {
+    const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
+    const groupId = created.json().group.id;
+    await app.inject({
+      method: 'POST',
+      url: '/api/twilio/inbound',
+      payload: { From: '+15550000001', Body: 'DRAGON' },
+    });
+    const listMembers = async () =>
+      (await app.inject({ method: 'GET', url: `/api/groups/${groupId}/members` })).json();
+    const { memberId } = (await listMembers()).members[0];
+    const rename = (name: unknown) =>
+      app.inject({ method: 'PATCH', url: `/api/members/${memberId}`, payload: { name } });
+
+    let res = await rename('  Ada Lovelace ');
+    expect(res.statusCode).toBe(200);
+    expect(res.json().member).toMatchObject({ id: memberId, name: 'Ada Lovelace' });
+    expect((await listMembers()).members[0].name).toBe('Ada Lovelace');
+
+    res = await rename('   ');
+    expect(res.statusCode).toBe(200);
+    expect(res.json().member.name).toBeUndefined();
+    expect((await listMembers()).members[0].name).toBeUndefined();
+
+    expect((await rename('x'.repeat(81))).statusCode).toBe(400);
+    const missing = await app.inject({
+      method: 'PATCH',
+      url: `/api/members/${new ObjectId().toHexString()}`,
+      payload: { name: 'Nobody' },
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
   it('lists who left the group apart from current members, most recent first', async () => {
     const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
     const groupId = created.json().group.id;

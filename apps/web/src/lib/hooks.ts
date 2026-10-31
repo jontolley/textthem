@@ -151,6 +151,16 @@ export function useDeleteGroup() {
   });
 }
 
+/** Names a member (an empty name clears it); the name shows in all their groups. */
+export function useUpdateMemberName() {
+  const api = useApiClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => api.updateMember(id, name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
+  });
+}
+
 /** Sends now, or schedules when `sendAt` (ISO) is given. */
 export function useBroadcast(groupId: string) {
   const api = useApiClient();

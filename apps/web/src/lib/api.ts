@@ -7,6 +7,7 @@ import type {
   ListGroupsResponse,
   ListMessagesResponse,
   MeResponse,
+  MemberResponse,
   UpdateGroupRequest,
   UpdateScheduledBroadcastRequest,
   VersionResponse,
@@ -63,6 +64,12 @@ export function createApiClient(getToken: TokenGetter) {
     deleteGroup: (id: string) => request<void>(`/api/groups/${id}`, { method: 'DELETE' }),
     listGroupMembers: (id: string) =>
       request<ListGroupMembersResponse>(`/api/groups/${id}/members`),
+    /** An empty name clears it. */
+    updateMember: (id: string, name: string) =>
+      request<MemberResponse>(`/api/members/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      }),
     /** Sends now, or schedules when `sendAt` (ISO) is given. */
     broadcast: (id: string, body: string, sendAt?: string) =>
       request<BroadcastResponse>(`/api/groups/${id}/broadcast`, {

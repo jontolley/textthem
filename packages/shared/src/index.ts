@@ -30,6 +30,8 @@ export interface Member {
   id: string;
   /** E.164 formatted phone number, e.g. "+15551234567". */
   phoneNumber: string;
+  /** Optional label an organizer gives them; shared across all their groups. */
+  name?: string;
   createdAt: string;
 }
 
@@ -47,6 +49,7 @@ export interface Subscription {
 export interface GroupMember {
   memberId: string;
   phoneNumber: string;
+  name?: string;
   status: SubscriptionStatus;
   subscribedAt?: string;
   /** When they left (texted STOP); set only on unsubscribed members. */
@@ -133,6 +136,15 @@ export interface CreateGroupRequest {
 }
 
 export type UpdateGroupRequest = Partial<CreateGroupRequest>;
+
+/** Sets a member's name; an empty name clears it. */
+export interface UpdateMemberRequest {
+  name: string;
+}
+
+export interface MemberResponse {
+  member: Member;
+}
 
 export interface BroadcastRequest {
   body: string;

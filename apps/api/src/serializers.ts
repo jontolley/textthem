@@ -1,5 +1,11 @@
-import type { Group, BroadcastMessage, DeliveryStats, InboundMessage } from '@text-them/shared';
-import type { GroupDoc, InboundMessageDoc, MessageDoc } from './db/documents.js';
+import type {
+  Group,
+  BroadcastMessage,
+  DeliveryStats,
+  InboundMessage,
+  Member,
+} from '@text-them/shared';
+import type { GroupDoc, InboundMessageDoc, MemberDoc, MessageDoc } from './db/documents.js';
 
 export function serializeGroup(doc: GroupDoc, memberCount?: number): Group {
   return {
@@ -11,6 +17,15 @@ export function serializeGroup(doc: GroupDoc, memberCount?: number): Group {
     memberCount,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
+  };
+}
+
+export function serializeMember(doc: MemberDoc): Member {
+  return {
+    id: doc._id.toHexString(),
+    phoneNumber: doc.phoneNumber,
+    name: doc.name,
+    createdAt: doc.createdAt.toISOString(),
   };
 }
 

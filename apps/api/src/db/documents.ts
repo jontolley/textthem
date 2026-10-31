@@ -26,6 +26,8 @@ export interface MemberDoc {
   _id: ObjectId;
   /** E.164. Unique. */
   phoneNumber: string;
+  /** Set by an organizer from the dashboard. Absent when unnamed. */
+  name?: string;
   createdAt: Date;
 }
 
