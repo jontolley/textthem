@@ -144,6 +144,11 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   `src/index.css`, so buttons, links and the green header bars all follow it.
   The font is Inter, from Google Fonts in `index.html`. Clerk gets matching
   `appearance` in `main.tsx`. Signed-out visitors to `/` see `LandingPage`.
+- **Dark mode**: light by default; the user menu (Clerk's `UserButton` in
+  `Layout`) toggles it. `src/lib/theme.tsx` saves the choice in localStorage and
+  sets `.dark` on `<html>`, and an inline script in `index.html` applies it before
+  first paint. The primary stays brand green in both modes, so use `text-link`
+  (not `text-primary`) for text links, and theme tokens rather than fixed colors.
 - **Icons**: `apps/web/public` holds the favicon, Apple and Android icons, and
   `site.webmanifest`. They're rendered from the SVGs in `apps/web/icons/` by
   `python3 apps/web/icons/render.py`, which needs Chrome and Pillow. Edit the
