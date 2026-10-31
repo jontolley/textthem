@@ -75,7 +75,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm text-muted-foreground [&_a]:text-primary [&_a]:underline [&_strong]:text-foreground [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
+      <CardContent className="space-y-3 text-sm text-muted-foreground [&_a]:text-link [&_a]:underline [&_strong]:text-foreground [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
         {children}
       </CardContent>
     </Card>

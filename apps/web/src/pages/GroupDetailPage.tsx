@@ -297,7 +297,7 @@ function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
           </Table>
           <p className="text-xs text-muted-foreground">
             Edit or cancel them in{' '}
-            <Link to="/history" className="text-primary underline-offset-4 hover:underline">
+            <Link to="/history" className="text-link underline-offset-4 hover:underline">
               History
             </Link>
             .
@@ -328,7 +328,7 @@ function CollapsibleToggle({
       onClick={onToggle}
       aria-expanded={open}
       aria-controls={id}
-      className="-m-1 flex w-full items-center gap-2 rounded-md p-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="-m-1 flex w-full items-center gap-2 rounded-md p-1 text-left hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <ChevronDown
         className={cn('h-4 w-4 shrink-0 transition-transform', !open && '-rotate-90')}

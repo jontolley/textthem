@@ -51,7 +51,7 @@ export function LandingPage() {
               <Link
                 key={org.slug}
                 to={orgPath(org, 'join')}
-                className="flex items-center justify-between gap-3 rounded-lg bg-white px-4 py-3.5 text-foreground transition-colors hover:bg-teal-50"
+                className="flex items-center justify-between gap-3 rounded-lg bg-card px-4 py-3.5 text-card-foreground transition-colors hover:bg-accent"
               >
                 <span className="flex flex-col gap-0.5">
                   <span className="font-semibold">{org.name}</span>
@@ -60,7 +60,7 @@ export function LandingPage() {
                   </span>
                 </span>
                 <ArrowRight
-                  className="h-[18px] w-[18px] shrink-0 text-primary"
+                  className="h-[18px] w-[18px] shrink-0 text-link"
                   aria-hidden="true"
                 />
               </Link>
@@ -104,7 +104,7 @@ export function LandingPage() {
             appearance={{
               elements: {
                 rootBox: { width: '100%' },
-                cardBox: { width: '100%', boxShadow: 'none', border: '1px solid #e2e8f0' },
+                cardBox: { width: '100%', boxShadow: 'none', border: '1px solid hsl(var(--border))' },
                 // Our heading above replaces Clerk's, and accounts are invite-only.
                 header: { display: 'none' },
                 footerAction: { display: 'none' },

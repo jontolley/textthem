@@ -58,7 +58,7 @@ function SenderGroups({ groups }: { groups: Group[] }) {
       {groups.map((g, i) => (
         <span key={g.id}>
           {i > 0 && ', '}
-          <Link to={`/groups/${g.id}`} className="hover:text-primary hover:underline">
+          <Link to={`/groups/${g.id}`} className="hover:text-link hover:underline">
             {g.name}
           </Link>
         </span>
