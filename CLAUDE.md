@@ -134,6 +134,7 @@ React + Vite + Tailwind + shadcn/ui (components owned in `src/components/ui`).
   `scripts/prerender.js`, which writes each public page to
   `dist/<path>.html`, so the content and `<title>` show without JavaScript. Page
   titles come from `useDocumentTitle` (via `LegalLayout`).
+  - It also gives each page its own `<link rel="canonical">` and writes `dist/sitemap.xml` listing `/` and every public page. `index.html`'s canonical points at `/`, so the SPA fallback for other paths isn't seen as duplicates. `public/robots.txt` points Google at the sitemap.
 - **Orgs** are defined in `src/config/org.ts` (`ORGS`, keyed by `slug`). Each
   org's campaign points at its own pages; `OrgRoute` resolves the slug and pages
   read it via `useOrg()`. Unknown slugs and keywords render "not found". An org's

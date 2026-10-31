@@ -1,0 +1,6 @@
+# The dashboard needs a sign-in, so only the public pages are worth crawling;
+# scripts/prerender.js writes the sitemap that lists them.
+User-agent: *
+Allow: /
+
+Sitemap: https://textthem.app/sitemap.xml

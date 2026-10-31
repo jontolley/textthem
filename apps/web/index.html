@@ -10,6 +10,10 @@
     <meta name="theme-color" content="#0f766e" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Text Them</title>
+    <!-- Every path without its own page gets this file, so they all point
+         Google at the home page; scripts/prerender.js swaps in each public
+         page's own address. -->
+    <link rel="canonical" href="https://textthem.app/" />
     <!-- Apply the saved theme before first paint (see src/lib/theme.tsx). -->
     <script>
       try {
