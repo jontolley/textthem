@@ -27,3 +27,7 @@ coverage/
 # Fly / Cloudflare
 .fly/
 .wrangler/
+
+# Claude Code: app-made worktrees and personal settings
+.claude/worktrees/
+.claude/settings.local.json
