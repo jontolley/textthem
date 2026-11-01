@@ -1,10 +1,15 @@
-import { ObjectId, type Filter } from 'mongodb';
+import { ObjectId, type Document, type Filter } from 'mongodb';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import type { BroadcastResponse, ListMessagesResponse } from '@text-them/shared';
+import type {
+  BroadcastResponse,
+  ListMessagesResponse,
+  ListSendersResponse,
+} from '@text-them/shared';
 import { badRequest, conflict, notFound } from '../errors.js';
+import { escapeRegex } from '../regex.js';
 import { serializeMessage } from '../serializers.js';
-import type { MessageDoc } from '../db/documents.js';
+import { COLLECTIONS, type MessageDoc } from '../db/documents.js';
 import { deliveryStats } from '../services/deliveries.js';
 import { sendBroadcast } from '../services/broadcasts.js';
 import type { TwilioService } from '../services/twilio.js';
@@ -32,13 +37,24 @@ const broadcastSchema = z.object({
   sendAt: sendAtSchema.optional(),
 });
 
+const isoTime = z
+  .string()
+  .datetime({ offset: true })
+  .transform((v) => new Date(v));
+
 const listMessagesSchema = z.object({
   list: z.enum(['scheduled', 'history']).default('history'),
+  sort: z.enum(['when', 'group']).default('when'),
+  dir: z.enum(['asc', 'desc']).optional(),
   groupId: z
     .string()
     .refine((v) => ObjectId.isValid(v), 'Invalid group id')
     .transform((v) => new ObjectId(v))
     .optional(),
+  sentBy: z.string().min(1).max(100).optional(),
+  q: z.string().trim().max(200).default(''),
+  from: isoTime.optional(),
+  to: isoTime.optional(),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(15),
 });
@@ -163,25 +179,80 @@ export async function messageRoutes(
   );
 
   // One page of the scheduled broadcasts (soonest first) or of the rest (most recent first).
+  // One page of the scheduled broadcasts or of the rest, sorted and filtered.
   fastify.get('/api/messages', async (request): Promise<ListMessagesResponse> => {
-    const { list, groupId, offset, limit } = listMessagesSchema.parse(request.query);
-    const match: Filter<MessageDoc> = {
+    const query = listMessagesSchema.parse(request.query);
+    const { list, sort, groupId, sentBy, q, from, to, offset, limit } = query;
+    const inList: Filter<MessageDoc> = {
       status: list === 'scheduled' ? 'scheduled' : { $ne: 'scheduled' },
-      ...(groupId ? { groupId } : {}),
     };
-    const docs = await messages
-      .aggregate<MessageDoc>([
-        { $match: match },
-        // Unsent broadcasts (canceled, missed, …) sort by when they were due.
+    const filters: Document = {
+      ...(groupId ? { groupId } : {}),
+      ...(sentBy ? { sentByUserId: sentBy } : {}),
+      ...(q ? { body: { $regex: escapeRegex(q), $options: 'i' } } : {}),
+      ...(from || to
+        ? { sortAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lt: to } : {}) } }
+        : {}),
+    };
+    // Scheduled ones read soonest first, the rest most recent first, unless asked otherwise.
+    const dir = (query.dir ?? (list === 'scheduled' ? 'asc' : 'desc')) === 'asc' ? 1 : -1;
+    // Ties (and the rows within a group) keep the list's natural order.
+    const natural = list === 'scheduled' ? 1 : -1;
+    const order: Record<string, 1 | -1> =
+      sort === 'group'
+        ? { groupName: dir, sortAt: natural, _id: natural }
+        : { sortAt: dir, _id: dir };
+
+    const [result] = await messages
+      .aggregate<{ page: MessageDoc[]; matched: { n: number }[] }>([
+        { $match: inList },
+        // Unsent broadcasts (canceled, missed, …) sort and filter by when they were due.
         { $addFields: { sortAt: { $ifNull: ['$sentAt', '$sendingStartedAt', '$scheduledFor'] } } },
-        { $sort: list === 'scheduled' ? { sortAt: 1, _id: 1 } : { sortAt: -1, _id: -1 } },
-        { $skip: offset },
-        { $limit: limit },
-        { $project: { sortAt: 0 } },
+        { $match: filters },
+        ...(sort === 'group'
+          ? [
+              {
+                $lookup: {
+                  from: COLLECTIONS.groups,
+                  localField: 'groupId',
+                  foreignField: '_id',
+                  as: 'group',
+                },
+              },
+              { $addFields: { groupName: { $toLower: { $first: '$group.name' } } } },
+            ]
+          : []),
+        { $sort: order },
+        {
+          $facet: {
+            page: [
+              { $skip: offset },
+              { $limit: limit },
+              { $project: { sortAt: 0, group: 0, groupName: 0 } },
+            ],
+            matched: [{ $count: 'n' }],
+          },
+        },
       ])
       .toArray();
-    const total = await messages.countDocuments(match);
+    const total = await messages.countDocuments(inList);
 
-    return { messages: await serialize(docs), total };
+    return {
+      messages: await serialize(result.page),
+      total,
+      matched: result.matched[0]?.n ?? 0,
+    };
+  });
+
+  // Who to offer in the dashboard's "Sent by" filter.
+  fastify.get('/api/messages/senders', async (): Promise<ListSendersResponse> => {
+    const ids: string[] = await messages.distinct('sentByUserId');
+    const names = await deps.users(ids);
+    const senders = ids.map((userId) => ({ userId, name: names.get(userId) }));
+    // Named people alphabetically, then any whose name couldn't be found.
+    senders.sort((a, b) =>
+      a.name && b.name ? a.name.localeCompare(b.name) : a.name ? -1 : b.name ? 1 : 0,
+    );
+    return { senders };
   });
 }

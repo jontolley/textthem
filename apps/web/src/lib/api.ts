@@ -8,6 +8,7 @@ import type {
   ListGroupsResponse,
   ListMessagesQuery,
   ListMessagesResponse,
+  ListSendersResponse,
   MeResponse,
   MemberResponse,
   UpdateGroupRequest,
@@ -82,6 +83,8 @@ export function createApiClient(getToken: TokenGetter) {
     /** One page of scheduled broadcasts, or of the rest. */
     listMessages: (query: ListMessagesQuery) =>
       request<ListMessagesResponse>(`/api/messages?${toParams(query)}`),
+    /** Everyone who has sent a broadcast, for the "Sent by" filter. */
+    listSenders: () => request<ListSendersResponse>('/api/messages/senders'),
     updateScheduledBroadcast: (id: string, body: UpdateScheduledBroadcastRequest) =>
       request<BroadcastResponse>(`/api/messages/${id}`, {
         method: 'PATCH',

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, Pencil, X } from 'lucide-react';
+import { ChevronRight, ListFilter, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BroadcastMessage } from '@text-them/shared';
+import { BroadcastFilterBar, SortableHead, useListView } from '@/components/BroadcastListControls';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
@@ -211,6 +212,8 @@ const COLUMNS = {
 /**
  * One of a list's broadcasts, as a table and its paging: five rows show, the
  * rest scroll. The card folds away behind its title, which shows the full count.
+ * The date and group headings sort it; the filter button opens search, group,
+ * sender and date filters. Both are kept in the page address.
  */
 function BroadcastListCard({
   id,
@@ -233,9 +236,16 @@ function BroadcastListCard({
   renderLast: (m: BroadcastMessage) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useMessageList(list);
+  const listView = useListView(list, list === 'scheduled' ? 'asc' : 'desc');
+  const [filterOpen, setFilterOpen] = useState(listView.filtering);
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useMessageList(
+    list,
+    listView.view,
+  );
   const messages = useRows(data?.pages);
-  const total = data?.pages[0]?.total ?? 0;
+  const firstPage = data?.pages[0];
+  const total = firstPage?.total ?? 0;
+  const matched = firstPage?.matched ?? 0;
   const { scroller, sentinel, maxHeight } = useScrollingList({
     rowCount: messages.length,
     hasNextPage,
@@ -258,77 +268,134 @@ function BroadcastListCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          <CollapsibleToggle
-            id={id}
-            title={title}
-            count={total}
-            open={open}
-            onToggle={() => setOpen((v) => !v)}
-          />
+        <CardTitle className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <CollapsibleToggle
+              id={id}
+              title={title}
+              count={total}
+              open={open}
+              onToggle={() => setOpen((v) => !v)}
+            />
+          </div>
+          <Button
+            type="button"
+            variant={filterOpen ? 'secondary' : 'ghost'}
+            size="icon"
+            className="h-8 w-8"
+            aria-label={`Filter ${title.toLowerCase()}`}
+            aria-pressed={filterOpen}
+            onClick={() => {
+              if (filterOpen) {
+                listView.clearFilters();
+                setFilterOpen(false);
+              } else {
+                setOpen(true);
+                setFilterOpen(true);
+              }
+            }}
+          >
+            <ListFilter className="h-4 w-4" />
+          </Button>
         </CardTitle>
       </CardHeader>
       {open && (
-        <CardContent id={id}>
-          <Table className="table-fixed" containerRef={scroller} containerStyle={{ maxHeight }}>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className={cn(STICKY_HEAD, COLUMNS.when)}>{whenLabel}</TableHead>
-                <TableHead className={cn(STICKY_HEAD, COLUMNS.group)}>Group</TableHead>
-                <TableHead className={cn(STICKY_HEAD, COLUMNS.sentBy)}>Sent by</TableHead>
-                <TableHead className={STICKY_HEAD}>Message</TableHead>
-                <TableHead className={cn(STICKY_HEAD, COLUMNS.last)}>{lastLabel}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {messages.map((m) => {
-                // Scheduled ones show when they'll go; unsent ones (canceled, missed) when they were due.
-                const when = list === 'scheduled' ? m.scheduledFor : (m.sentAt ?? m.scheduledFor);
-                const rowOpen = expanded.has(m.id);
-                return (
-                  // Click (or Enter/Space) shows the whole message; again folds it back.
-                  <TableRow
-                    key={m.id}
-                    tabIndex={0}
-                    aria-expanded={rowOpen}
-                    // Cells stay vertically centered when it opens, so a short message doesn't shift.
-                    className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    onClick={(e) => {
-                      // Links and buttons in the row (Twilio errors, Edit, Cancel) do their own thing.
-                      if (!(e.target as HTMLElement).closest('a, button')) toggle(m.id);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.target !== e.currentTarget) return;
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        toggle(m.id);
-                      }
-                    }}
-                  >
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      <ChevronRight
-                        className={cn(
-                          'mr-1 inline h-4 w-4 align-[-3px] transition-transform',
-                          rowOpen && 'rotate-90',
-                        )}
-                        aria-hidden
-                      />
-                      {when ? formatDateTime(when) : '—'}
-                    </TableCell>
-                    <TableCell>{groupName(m.groupId)}</TableCell>
-                    <TableCell className="truncate">{m.sentByName ?? '—'}</TableCell>
-                    <TableCell className={rowOpen ? 'whitespace-pre-wrap break-words' : 'truncate'}>
-                      {m.body}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right">{renderLast(m)}</TableCell>
-                  </TableRow>
-                );
-              })}
-              {hasNextPage && (
-                <LoadMoreRow sentinel={sentinel} columns={5} loading={isFetchingNextPage} />
+        <CardContent id={id} className="space-y-3">
+          {filterOpen && (
+            <div className="space-y-1">
+              <BroadcastFilterBar
+                label={title.toLowerCase()}
+                values={listView.values}
+                set={listView.set}
+                onClear={listView.clearFilters}
+              />
+              {listView.filtering && firstPage && (
+                <p className="text-xs text-muted-foreground" aria-live="polite">
+                  {matched} of {total} match
+                </p>
               )}
-            </TableBody>
-          </Table>
+            </div>
+          )}
+          {firstPage && matched === 0 && (
+            <p className="text-sm text-muted-foreground">No broadcasts match these filters.</p>
+          )}
+          {messages.length > 0 && (
+            <Table className="table-fixed" containerRef={scroller} containerStyle={{ maxHeight }}>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <SortableHead
+                    label={whenLabel}
+                    active={listView.sort === 'when'}
+                    dir={listView.dir}
+                    onSort={() => listView.sortBy('when')}
+                    className={cn(STICKY_HEAD, COLUMNS.when)}
+                  />
+                  <SortableHead
+                    label="Group"
+                    active={listView.sort === 'group'}
+                    dir={listView.dir}
+                    onSort={() => listView.sortBy('group')}
+                    className={cn(STICKY_HEAD, COLUMNS.group)}
+                  />
+                  <TableHead className={cn(STICKY_HEAD, COLUMNS.sentBy)}>Sent by</TableHead>
+                  <TableHead className={STICKY_HEAD}>Message</TableHead>
+                  <TableHead className={cn(STICKY_HEAD, COLUMNS.last)}>{lastLabel}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {messages.map((m) => {
+                  // Scheduled ones show when they'll go; unsent ones (canceled, missed) when they were due.
+                  const when = list === 'scheduled' ? m.scheduledFor : (m.sentAt ?? m.scheduledFor);
+                  const rowOpen = expanded.has(m.id);
+                  return (
+                    // Click (or Enter/Space) shows the whole message; again folds it back.
+                    <TableRow
+                      key={m.id}
+                      tabIndex={0}
+                      aria-expanded={rowOpen}
+                      // Cells stay vertically centered when it opens, so a short message doesn't shift.
+                      className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      onClick={(e) => {
+                        // Links and buttons in the row (Twilio errors, Edit, Cancel) do their own thing.
+                        if (!(e.target as HTMLElement).closest('a, button')) toggle(m.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggle(m.id);
+                        }
+                      }}
+                    >
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        <ChevronRight
+                          className={cn(
+                            'mr-1 inline h-4 w-4 align-[-3px] transition-transform',
+                            rowOpen && 'rotate-90',
+                          )}
+                          aria-hidden
+                        />
+                        {when ? formatDateTime(when) : '—'}
+                      </TableCell>
+                      <TableCell>{groupName(m.groupId)}</TableCell>
+                      <TableCell className="truncate">{m.sentByName ?? '—'}</TableCell>
+                      <TableCell
+                        className={rowOpen ? 'whitespace-pre-wrap break-words' : 'truncate'}
+                      >
+                        {m.body}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right">
+                        {renderLast(m)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {hasNextPage && (
+                  <LoadMoreRow sentinel={sentinel} columns={5} loading={isFetchingNextPage} />
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       )}
     </Card>

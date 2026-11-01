@@ -209,7 +209,96 @@ describe('scheduled broadcasts', () => {
       'later 99',
     ]);
     const tigersOnly = await page(`list=scheduled&groupId=${tigers.toHexString()}`);
-    expect(tigersOnly).toMatchObject({ total: 1, messages: [{ body: 'later 99' }] });
+    expect(tigersOnly).toMatchObject({ total: 4, matched: 1, messages: [{ body: 'later 99' }] });
+  });
+
+  it('sorts by group name or time, and filters by group, sender, text and date', async () => {
+    const now = new Date();
+    const addGroup = async (name: string, keyword: string) => {
+      const _id = new ObjectId();
+      await database.collections.groups.insertOne({
+        _id,
+        name,
+        keyword,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return _id;
+    };
+    const zebras = await addGroup('Zebras', 'ZEBRA');
+    const apes = await addGroup('apes', 'APE'); // lower case still sorts first
+    const day = (n: number) => new Date(Date.UTC(2026, 9, n, 21));
+    const sent = (groupId: ObjectId, n: number, body: string, sentByUserId = 'user_123') =>
+      database.collections.messages.insertOne({
+        _id: new ObjectId(),
+        groupId,
+        body,
+        sentByUserId,
+        status: 'sent',
+        sentAt: day(n),
+        recipientCount: 0,
+        acceptedCount: 0,
+        failedCount: 0,
+      });
+    await sent(zebras, 1, 'Zebra talk one');
+    await sent(apes, 2, 'Ape talk (one)');
+    await sent(zebras, 3, 'Zebra talk two', 'user_other');
+    await sent(apes, 4, 'Ape talk two');
+    const bodies = async (query: string) => {
+      const res = (await app.inject({ method: 'GET', url: `/api/messages?${query}` })).json();
+      return { bodies: res.messages.map((m: BroadcastMessage) => m.body), ...res };
+    };
+
+    expect((await bodies('list=history')).bodies).toEqual([
+      'Ape talk two',
+      'Zebra talk two',
+      'Ape talk (one)',
+      'Zebra talk one',
+    ]);
+    expect((await bodies('list=history&dir=asc')).bodies[0]).toBe('Zebra talk one');
+    // By group name; most recent first within each group.
+    expect((await bodies('list=history&sort=group&dir=asc')).bodies).toEqual([
+      'Ape talk two',
+      'Ape talk (one)',
+      'Zebra talk two',
+      'Zebra talk one',
+    ]);
+    expect((await bodies('list=history&sort=group&dir=desc')).bodies[0]).toBe('Zebra talk two');
+
+    const byGroup = await bodies(`list=history&groupId=${apes.toHexString()}`);
+    expect(byGroup).toMatchObject({ total: 4, matched: 2 });
+    expect((await bodies('list=history&sentBy=user_other')).bodies).toEqual(['Zebra talk two']);
+    expect((await bodies(`list=history&q=${encodeURIComponent('(ONE)')}`)).bodies).toEqual([
+      'Ape talk (one)',
+    ]);
+    const range = `from=${day(2).toISOString()}&to=${day(4).toISOString()}`;
+    expect((await bodies(`list=history&${range}`)).bodies).toEqual([
+      'Zebra talk two',
+      'Ape talk (one)',
+    ]);
+  });
+
+  it('lists everyone who has sent a broadcast, named ones first', async () => {
+    const groupId = await seedGroup([]);
+    for (const sentByUserId of ['user_gone', 'user_123', 'user_123']) {
+      await database.collections.messages.insertOne({
+        _id: new ObjectId(),
+        groupId,
+        body: 'Hi',
+        sentByUserId,
+        status: 'sent',
+        sentAt: new Date(),
+        recipientCount: 0,
+        acceptedCount: 0,
+        failedCount: 0,
+      });
+    }
+    const res = await app.inject({ method: 'GET', url: '/api/messages/senders' });
+    expect(res.json().senders).toEqual([
+      { userId: 'user_123', name: 'Jon T' },
+      { userId: 'user_gone' },
+    ]);
   });
 
   it('schedules without sending anything', async () => {

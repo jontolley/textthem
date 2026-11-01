@@ -8,6 +8,7 @@ import type {
   GroupMember,
 } from '@text-them/shared';
 import { badRequest, conflict, isDuplicateKeyError, notFound } from '../errors.js';
+import { escapeRegex } from '../regex.js';
 import { serializeGroup } from '../serializers.js';
 import {
   COLLECTIONS,
@@ -45,8 +46,7 @@ const listMembersSchema = z.object({
  * is compared as digits, so "(509) 209-7297", "509-209" and "+1509" all work.
  */
 function memberFilter(q: string): Document {
-  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const name = { 'member.name': { $regex: escaped, $options: 'i' } };
+  const name = { 'member.name': { $regex: escapeRegex(q), $options: 'i' } };
   const digits = q.replace(/\D/g, '');
   return digits ? { $or: [name, { 'member.phoneNumber': { $regex: digits } }] } : name;
 }
@@ -66,7 +66,10 @@ async function subscribedCounts(
     .aggregate<{
       _id: ObjectId;
       count: number;
-    }>([{ $match: { groupId: { $in: groupIds }, status: 'subscribed' } }, { $group: { _id: '$groupId', count: { $sum: 1 } } }])
+    }>([
+      { $match: { groupId: { $in: groupIds }, status: 'subscribed' } },
+      { $group: { _id: '$groupId', count: { $sum: 1 } } },
+    ])
     .toArray();
   return new Map(rows.map((r) => [r._id.toHexString(), r.count]));
 }

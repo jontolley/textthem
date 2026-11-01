@@ -12,6 +12,7 @@ import {
 import type {
   ChangeTopic,
   CreateGroupRequest,
+  ListMessagesQuery,
   SubscriptionStatus,
   UpdateGroupRequest,
   UpdateScheduledBroadcastRequest,
@@ -64,20 +65,35 @@ export function useGroupMembers(id: string, status: SubscriptionStatus, q: strin
 /** How many rows each request fetches as a list scrolls. */
 export const PAGE_SIZE = 15;
 
+/** How a broadcast list is sorted and filtered (everything but which list and the paging). */
+export type MessageListView = Omit<ListMessagesQuery, 'list' | 'offset' | 'limit'>;
+
 /**
  * Scheduled broadcasts (soonest first) or the rest (most recent first),
- * fetched a page at a time.
+ * fetched a page at a time, optionally sorted and filtered another way.
  */
-export function useMessageList(list: 'scheduled' | 'history') {
+export function useMessageList(list: 'scheduled' | 'history', view: MessageListView = {}) {
   const api = useApiClient();
   return useInfiniteQuery({
-    queryKey: ['messages', list],
-    queryFn: ({ pageParam }) => api.listMessages({ list, offset: pageParam, limit: PAGE_SIZE }),
+    queryKey: ['messages', list, view],
+    queryFn: ({ pageParam }) =>
+      api.listMessages({ ...view, list, offset: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, p) => n + p.messages.length, 0);
-      return loaded < last.total ? loaded : undefined;
+      return loaded < last.matched ? loaded : undefined;
     },
+    // Keep the current rows on screen while a new sort or filter loads.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Everyone who has sent a broadcast, named ones alphabetically. */
+export function useSenders() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['messages', 'senders'],
+    queryFn: () => api.listSenders().then((r) => r.senders),
   });
 }
 

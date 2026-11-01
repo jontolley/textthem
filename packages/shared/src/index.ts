@@ -203,8 +203,20 @@ export interface ListGroupMembersResponse {
  */
 export interface ListMessagesQuery {
   list?: 'scheduled' | 'history';
+  /** Order by send time (the default) or group name; ties fall back to send time. */
+  sort?: 'when' | 'group';
+  /** Defaults to soonest first for `scheduled` and most recent first for `history`. */
+  dir?: 'asc' | 'desc';
   /** Only this group's broadcasts. */
   groupId?: string;
+  /** Only broadcasts this Clerk user sent. */
+  sentBy?: string;
+  /** Matches the message text, ignoring case. */
+  q?: string;
+  /** Send time on or after this ISO time. */
+  from?: string;
+  /** Send time before this ISO time. */
+  to?: string;
   offset?: number;
   limit?: number;
 }
@@ -212,8 +224,15 @@ export interface ListMessagesQuery {
 export interface ListMessagesResponse {
   /** This page. */
   messages: BroadcastMessage[];
-  /** Everything in the list. */
+  /** Everything in the list, ignoring the filters. */
   total: number;
+  /** How many match the filters; the same as `total` without any. */
+  matched: number;
+}
+
+/** Everyone who has sent or scheduled a broadcast (`GET /api/messages/senders`), by name. */
+export interface ListSendersResponse {
+  senders: { userId: string; name?: string }[];
 }
 
 export interface ListInboundMessagesResponse {
