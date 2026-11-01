@@ -225,7 +225,8 @@ export function GroupDetailPage() {
 
 /** This group's broadcasts waiting to go out, under the send form. */
 function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
-  const [open, setOpen] = useState(true);
+  // Folded by default: the count says what's waiting, and the send form stays the focus.
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="mt-6 space-y-3 border-t pt-4">
