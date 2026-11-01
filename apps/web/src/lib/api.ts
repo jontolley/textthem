@@ -2,6 +2,7 @@ import type {
   BroadcastResponse,
   CreateGroupRequest,
   GroupResponse,
+  ListGroupMembersQuery,
   ListGroupMembersResponse,
   ListInboundMessagesResponse,
   ListGroupsResponse,
@@ -62,8 +63,14 @@ export function createApiClient(getToken: TokenGetter) {
     updateGroup: (id: string, body: UpdateGroupRequest) =>
       request<GroupResponse>(`/api/groups/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     deleteGroup: (id: string) => request<void>(`/api/groups/${id}`, { method: 'DELETE' }),
-    listGroupMembers: (id: string) =>
-      request<ListGroupMembersResponse>(`/api/groups/${id}/members`),
+    /** One page of a group's members, or of the people who left. */
+    listGroupMembers: (id: string, query: ListGroupMembersQuery) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== '') params.set(key, String(value));
+      }
+      return request<ListGroupMembersResponse>(`/api/groups/${id}/members?${params}`);
+    },
     /** An empty name clears it. */
     updateMember: (id: string, name: string) =>
       request<MemberResponse>(`/api/members/${id}`, {

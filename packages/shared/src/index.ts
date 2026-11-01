@@ -172,11 +172,26 @@ export interface GroupResponse {
   group: Group;
 }
 
+/**
+ * Query for one page of a group's members (`GET /api/groups/:id/members`).
+ * `subscribed` lists current members, oldest first; `unsubscribed` lists people
+ * who left (texted STOP), most recent first.
+ */
+export interface ListGroupMembersQuery {
+  status?: SubscriptionStatus;
+  /** Matches the name, or the phone number's digits (so formatting doesn't matter). */
+  q?: string;
+  offset?: number;
+  limit?: number;
+}
+
 export interface ListGroupMembersResponse {
-  /** Currently subscribed: who a broadcast goes to. */
+  /** This page. */
   members: GroupMember[];
-  /** People who left (texted STOP), most recent first. */
-  unsubscribed: GroupMember[];
+  /** Everyone in the group with this status, ignoring the filter. */
+  total: number;
+  /** How many match the filter; the same as `total` without one. */
+  matched: number;
 }
 
 export interface ListMessagesResponse {

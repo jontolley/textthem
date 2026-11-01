@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, ChevronDown, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { MemberListCard } from '@/components/MemberList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,30 +19,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { BroadcastMessage } from '@text-them/shared';
-import {
-  useBroadcast,
-  useDeleteGroup,
-  useGroup,
-  useGroupMembers,
-  useMessages,
-  useUpdateMemberName,
-} from '@/lib/hooks';
+import { useBroadcast, useDeleteGroup, useGroup, useMessages } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
-import { formatPhoneNumber } from '@/lib/phone';
-import { cn } from '@/lib/utils';
 
 const MAX_LENGTH = 1600;
-/** How long after the last keystroke a member's name saves. */
-const NAME_SAVE_DELAY_MS = 2000;
 
 export function GroupDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { data: group, isLoading } = useGroup(id);
-  const { data: memberLists } = useGroupMembers(id);
-  const members = memberLists?.members;
-  const leftGroup = memberLists?.unsubscribed ?? [];
   const { data: messages } = useMessages();
   // The API lists scheduled broadcasts soonest first.
   const scheduled = messages?.filter((m) => m.groupId === id && m.status === 'scheduled') ?? [];
@@ -86,11 +74,14 @@ export function GroupDetailPage() {
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (!group) return <p className="text-sm text-destructive">Group not found.</p>;
 
-  const memberCount = members?.length ?? group.memberCount ?? 0;
+  const memberCount = group.memberCount ?? 0;
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        to="/"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> Back to groups
       </Link>
 
@@ -175,7 +166,11 @@ export function GroupDetailPage() {
                 type="submit"
                 disabled={broadcast.isPending || (!scheduleLater && memberCount === 0)}
               >
-                {scheduleLater ? <CalendarClock className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                {scheduleLater ? (
+                  <CalendarClock className="h-4 w-4" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
                 {scheduleLater
                   ? broadcast.isPending
                     ? 'Scheduling…'
@@ -190,88 +185,43 @@ export function GroupDetailPage() {
         </CardContent>
       </Card>
 
-      <CollapsibleCard id="member-list" title="Members" count={memberCount} defaultOpen>
-        {memberCount === 0 ? (
+      <MemberListCard
+        id="member-list"
+        title="Members"
+        groupId={id}
+        status="subscribed"
+        defaultOpen
+        fallbackCount={memberCount}
+        empty={
           <p className="text-sm text-muted-foreground">
             No subscribers yet. Share the keyword{' '}
             <span className="font-mono font-medium">{group.keyword}</span> for people to text in.
           </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Phone number</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Subscribed</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members?.map((m) => (
-                <TableRow key={m.memberId} className="group">
-                  <TableCell className="whitespace-nowrap tabular-nums">
-                    {formatPhoneNumber(m.phoneNumber)}
-                  </TableCell>
-                  <TableCell className="w-full py-1">
-                    <MemberNameInput memberId={m.memberId} name={m.name} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(m.subscribedAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CollapsibleCard>
+        }
+        dateColumns={[{ label: 'Subscribed', value: (m) => m.subscribedAt }]}
+      />
 
       {/* Shown once someone has left. Collapsed by default: it's looked at now and then. */}
-      {leftGroup.length > 0 && (
-        <CollapsibleCard
-          id="left-group-list"
-          title="Left the group"
-          count={leftGroup.length}
-          defaultOpen={false}
-        >
+      <MemberListCard
+        id="left-group-list"
+        title="Left the group"
+        groupId={id}
+        status="unsubscribed"
+        defaultOpen={false}
+        hideWhenEmpty
+        intro={
           <p className="text-sm text-muted-foreground">
             People who texted STOP. STOP takes them out of every group and they get no more texts.
             To rejoin, they text START and then the group&rsquo;s keyword.
           </p>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Phone number</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Left</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leftGroup.map((m) => (
-                <TableRow key={m.memberId} className="group">
-                  <TableCell className="whitespace-nowrap tabular-nums">
-                    {formatPhoneNumber(m.phoneNumber)}
-                  </TableCell>
-                  <TableCell className="w-full py-1">
-                    <MemberNameInput memberId={m.memberId} name={m.name} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(m.subscribedAt)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(m.unsubscribedAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CollapsibleCard>
-      )}
+        }
+        dateColumns={[
+          { label: 'Joined', value: (m) => m.subscribedAt },
+          { label: 'Left', value: (m) => m.unsubscribedAt },
+        ]}
+      />
     </div>
   );
-}
-
-function formatDate(iso: string | undefined): string {
-  return iso ? new Date(iso).toLocaleDateString() : '—';
 }
 
 /** This group's broadcasts waiting to go out, under the send form. */
@@ -320,175 +270,5 @@ function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * A member's name, edited in place: it looks like plain text until clicked, and
- * saves a couple of seconds after typing stops, or straight away on blur or
- * Enter. Escape puts back the saved name. Its row needs the `group` class, which
- * reveals the "Add a name" hint on hover.
- */
-function MemberNameInput({ memberId, name }: { memberId: string; name?: string }) {
-  const updateName = useUpdateMemberName();
-  const saved = name ?? '';
-  const [value, setValue] = useState(saved);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  const focused = useRef(false);
-  // What the server has (or is about to have), so unchanged text isn't resaved.
-  const lastSaved = useRef(saved);
-  const valueRef = useRef(value);
-  valueRef.current = value;
-
-  // Take a name changed elsewhere (e.g. another open dashboard), unless it's being edited here.
-  useEffect(() => {
-    lastSaved.current = saved;
-    if (!focused.current && timer.current === undefined) setValue(saved);
-  }, [saved]);
-
-  const save = useCallback(() => {
-    clearTimeout(timer.current);
-    timer.current = undefined;
-    const next = valueRef.current.trim();
-    const previous = lastSaved.current;
-    if (next === previous) return;
-    lastSaved.current = next;
-    setStatus('saving');
-    updateName.mutate(
-      { id: memberId, name: next },
-      {
-        onSuccess: () => {
-          setStatus('saved');
-          setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 2000);
-        },
-        onError: (err) => {
-          lastSaved.current = previous;
-          setStatus('idle');
-          toast.error(err instanceof ApiError ? err.message : 'Failed to save name');
-        },
-      },
-    );
-  }, [memberId, updateName]);
-
-  // Don't lose a pending edit when leaving the page.
-  const saveRef = useRef(save);
-  saveRef.current = save;
-  useEffect(
-    () => () => {
-      if (timer.current !== undefined) saveRef.current();
-    },
-    [],
-  );
-
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        value={value}
-        maxLength={80}
-        placeholder="Add a name"
-        aria-label="Member name"
-        // The "Add a name" hint shows only while the row is hovered or the field is focused.
-        className="h-8 border-transparent px-2 shadow-none placeholder:text-transparent hover:border-input focus-visible:border-input focus-visible:placeholder:text-muted-foreground group-hover:placeholder:text-muted-foreground"
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onChange={(e) => {
-          setValue(e.target.value);
-          setStatus('idle');
-          clearTimeout(timer.current);
-          timer.current = setTimeout(save, NAME_SAVE_DELAY_MS);
-        }}
-        onBlur={() => {
-          focused.current = false;
-          save();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-          if (e.key === 'Escape') {
-            clearTimeout(timer.current);
-            timer.current = undefined;
-            setValue(lastSaved.current);
-            valueRef.current = lastSaved.current;
-            e.currentTarget.blur();
-          }
-        }}
-      />
-      <span className="w-12 shrink-0 text-xs text-muted-foreground" aria-live="polite">
-        {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : ''}
-      </span>
-    </div>
-  );
-}
-
-/** A section title that folds its contents away when clicked, with a count beside it. */
-function CollapsibleToggle({
-  id,
-  title,
-  count,
-  open,
-  onToggle,
-}: {
-  id: string;
-  title: string;
-  count: number;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      aria-controls={id}
-      className="-m-1 flex w-full items-center gap-2 rounded-md p-1 text-left hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <ChevronDown
-        className={cn('h-4 w-4 shrink-0 transition-transform', !open && '-rotate-90')}
-        aria-hidden
-      />
-      {title}
-      <Badge variant="secondary" className="font-medium tabular-nums">
-        {count}
-      </Badge>
-    </button>
-  );
-}
-
-/** A card whose contents fold away behind its title, which shows a count. */
-function CollapsibleCard({
-  id,
-  title,
-  count,
-  defaultOpen,
-  children,
-}: {
-  id: string;
-  title: string;
-  count: number;
-  defaultOpen: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          <CollapsibleToggle
-            id={id}
-            title={title}
-            count={count}
-            open={open}
-            onToggle={() => setOpen((v) => !v)}
-          />
-        </CardTitle>
-      </CardHeader>
-      {open && (
-        <CardContent id={id} className="space-y-3">
-          {children}
-        </CardContent>
-      )}
-    </Card>
   );
 }

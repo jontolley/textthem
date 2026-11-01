@@ -1,13 +1,18 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
-    </div>
-  ),
-);
+const Table = React.forwardRef<
+  HTMLTableElement,
+  React.HTMLAttributes<HTMLTableElement> & {
+    /** Classes for the scrolling wrapper, e.g. a max height so the rows scroll under a sticky header. */
+    containerClassName?: string;
+    containerRef?: React.Ref<HTMLDivElement>;
+  }
+>(({ className, containerClassName, containerRef, ...props }, ref) => (
+  <div ref={containerRef} className={cn('relative w-full overflow-auto', containerClassName)}>
+    <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
+  </div>
+));
 Table.displayName = 'Table';
 
 const TableHeader = React.forwardRef<
@@ -43,10 +48,7 @@ const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
-    className={cn(
-      'h-10 px-2 text-left align-middle font-medium text-muted-foreground',
-      className,
-    )}
+    className={cn('h-10 px-2 text-left align-middle font-medium text-muted-foreground', className)}
     {...props}
   />
 ));

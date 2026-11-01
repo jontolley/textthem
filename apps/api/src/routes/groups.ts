@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Document } from 'mongodb';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type {
@@ -9,7 +9,12 @@ import type {
 } from '@text-them/shared';
 import { badRequest, conflict, isDuplicateKeyError, notFound } from '../errors.js';
 import { serializeGroup } from '../serializers.js';
-import type { GroupDoc } from '../db/documents.js';
+import {
+  COLLECTIONS,
+  type GroupDoc,
+  type MemberDoc,
+  type SubscriptionDoc,
+} from '../db/documents.js';
 
 const keywordSchema = z
   .string()
@@ -28,6 +33,24 @@ const createGroupSchema = z.object({
 
 const updateGroupSchema = createGroupSchema.partial();
 
+const listMembersSchema = z.object({
+  status: z.enum(['subscribed', 'unsubscribed']).default('subscribed'),
+  q: z.string().trim().max(100).default(''),
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(15),
+});
+
+/**
+ * Matches a member by name (case-insensitive) or by phone number. The number
+ * is compared as digits, so "(509) 209-7297", "509-209" and "+1509" all work.
+ */
+function memberFilter(q: string): Document {
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const name = { 'member.name': { $regex: escaped, $options: 'i' } };
+  const digits = q.replace(/\D/g, '');
+  return digits ? { $or: [name, { 'member.phoneNumber': { $regex: digits } }] } : name;
+}
+
 function parseObjectId(value: string): ObjectId {
   if (!ObjectId.isValid(value)) throw badRequest('Invalid id');
   return new ObjectId(value);
@@ -40,16 +63,16 @@ async function subscribedCounts(
 ): Promise<Map<string, number>> {
   if (groupIds.length === 0) return new Map();
   const rows = await fastify.mongo.collections.subscriptions
-    .aggregate<{ _id: ObjectId; count: number }>([
-      { $match: { groupId: { $in: groupIds }, status: 'subscribed' } },
-      { $group: { _id: '$groupId', count: { $sum: 1 } } },
-    ])
+    .aggregate<{
+      _id: ObjectId;
+      count: number;
+    }>([{ $match: { groupId: { $in: groupIds }, status: 'subscribed' } }, { $group: { _id: '$groupId', count: { $sum: 1 } } }])
     .toArray();
   return new Map(rows.map((r) => [r._id.toHexString(), r.count]));
 }
 
 export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
-  const { groups, subscriptions, members, messages } = fastify.mongo.collections;
+  const { groups, subscriptions, messages } = fastify.mongo.collections;
 
   // All routes in this plugin require authentication.
   fastify.addHook('preHandler', fastify.requireAuth);
@@ -115,7 +138,8 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
         const counts = await subscribedCounts(fastify, [id]);
         return { group: serializeGroup(updated, counts.get(id.toHexString()) ?? 0) };
       } catch (err) {
-        if (isDuplicateKeyError(err)) throw conflict(`Keyword "${input.keyword}" is already in use`);
+        if (isDuplicateKeyError(err))
+          throw conflict(`Keyword "${input.keyword}" is already in use`);
         throw err;
       }
     },
@@ -127,39 +151,63 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     if (result.deletedCount === 0) throw notFound('Group not found');
     await subscriptions.deleteMany({ groupId: id });
     // Nothing left to send them to.
-    await messages.updateMany({ groupId: id, status: 'scheduled' }, { $set: { status: 'canceled' } });
+    await messages.updateMany(
+      { groupId: id, status: 'scheduled' },
+      { $set: { status: 'canceled' } },
+    );
     fastify.events.notify('groups');
     fastify.events.notify('messages');
     reply.code(204);
   });
 
+  // One page of a group's current members or of the people who left, optionally filtered.
   fastify.get<{ Params: { id: string } }>(
     '/api/groups/:id/members',
     async (request): Promise<ListGroupMembersResponse> => {
       const id = parseObjectId(request.params.id);
+      const { status, q, offset, limit } = listMembersSchema.parse(request.query);
       const group = await groups.findOne({ _id: id });
       if (!group) throw notFound('Group not found');
 
-      const subs = await subscriptions.find({ groupId: id }).toArray();
-      const memberDocs = await members
-        .find({ _id: { $in: subs.map((s) => s.memberId) } })
+      type Row = SubscriptionDoc & { member: MemberDoc };
+      const [result] = await subscriptions
+        .aggregate<{ page: Row[]; matched: { n: number }[] }>([
+          { $match: { groupId: id, status } },
+          {
+            $lookup: {
+              from: COLLECTIONS.members,
+              localField: 'memberId',
+              foreignField: '_id',
+              as: 'member',
+            },
+          },
+          { $unwind: '$member' },
+          ...(q ? [{ $match: memberFilter(q) }] : []),
+          // Members in the order they joined; leavers most recent first.
+          { $sort: status === 'subscribed' ? { _id: 1 } : { unsubscribedAt: -1, _id: -1 } },
+          {
+            $facet: {
+              page: [{ $skip: offset }, { $limit: limit }],
+              matched: [{ $count: 'n' }],
+            },
+          },
+        ])
         .toArray();
-      const memberById = new Map(memberDocs.map((m) => [m._id.toHexString(), m]));
+      const total = await subscriptions.countDocuments({ groupId: id, status });
 
-      const toMember = (s: (typeof subs)[number]): GroupMember => ({
-        memberId: s.memberId.toHexString(),
-        phoneNumber: memberById.get(s.memberId.toHexString())?.phoneNumber ?? '',
-        name: memberById.get(s.memberId.toHexString())?.name,
-        status: s.status,
-        subscribedAt: s.subscribedAt?.toISOString(),
-        unsubscribedAt: s.unsubscribedAt?.toISOString(),
-      });
-      const left = subs
-        .filter((s) => s.status === 'unsubscribed')
-        .sort((a, b) => (b.unsubscribedAt?.getTime() ?? 0) - (a.unsubscribedAt?.getTime() ?? 0));
       return {
-        members: subs.filter((s) => s.status === 'subscribed').map(toMember),
-        unsubscribed: left.map(toMember),
+        members: result.page.map(
+          (s): GroupMember => ({
+            memberId: s.memberId.toHexString(),
+            phoneNumber: s.member.phoneNumber,
+            name: s.member.name,
+            status: s.status,
+            subscribedAt: s.subscribedAt?.toISOString(),
+            unsubscribedAt: s.unsubscribedAt?.toISOString(),
+          }),
+        ),
+        total,
+        matched: result.matched[0]?.n ?? 0,
       };
     },
   );

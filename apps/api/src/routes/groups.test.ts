@@ -205,8 +205,12 @@ describe('groups API', () => {
     const groupId = created.json().group.id;
     const text = (From: string, Body: string) =>
       app.inject({ method: 'POST', url: '/api/twilio/inbound', payload: { From, Body } });
-    const listMembers = async () =>
-      (await app.inject({ method: 'GET', url: `/api/groups/${groupId}/members` })).json();
+    const list = async (status: string) =>
+      (
+        await app.inject({ method: 'GET', url: `/api/groups/${groupId}/members?status=${status}` })
+      ).json();
+    const phones = (res: { members: { phoneNumber: string }[] }) =>
+      res.members.map((m) => m.phoneNumber);
 
     for (const from of ['+15550000001', '+15550000002', '+15550000003']) {
       await text(from, 'DRAGON');
@@ -215,27 +219,89 @@ describe('groups API', () => {
     await new Promise((resolve) => setTimeout(resolve, 5)); // so the two STOPs get distinct times
     await text('+15550000003', 'STOP');
 
-    let res = await listMembers();
-    expect(res.members.map((m: { phoneNumber: string }) => m.phoneNumber)).toEqual([
-      '+15550000002',
-    ]);
-    expect(res.unsubscribed).toMatchObject([
+    let members = await list('subscribed');
+    let left = await list('unsubscribed');
+    expect(phones(members)).toEqual(['+15550000002']);
+    expect(members.total).toBe(1);
+    expect(left.members).toMatchObject([
       { phoneNumber: '+15550000003', status: 'unsubscribed' },
       { phoneNumber: '+15550000001', status: 'unsubscribed' },
     ]);
-    expect(res.unsubscribed[0].unsubscribedAt).toEqual(expect.any(String));
-    expect(res.members[0].unsubscribedAt).toBeUndefined();
+    expect(left.total).toBe(2);
+    expect(left.members[0].unsubscribedAt).toEqual(expect.any(String));
+    expect(members.members[0].unsubscribedAt).toBeUndefined();
 
     // Texting the keyword again moves them back.
     await text('+15550000001', 'DRAGON');
-    res = await listMembers();
-    expect(res.members.map((m: { phoneNumber: string }) => m.phoneNumber).sort()).toEqual([
-      '+15550000001',
-      '+15550000002',
-    ]);
-    expect(res.unsubscribed.map((m: { phoneNumber: string }) => m.phoneNumber)).toEqual([
-      '+15550000003',
-    ]);
+    members = await list('subscribed');
+    left = await list('unsubscribed');
+    expect(phones(members).sort()).toEqual(['+15550000001', '+15550000002']);
+    expect(phones(left)).toEqual(['+15550000003']);
+  });
+
+  it('pages through members in join order, with the full count on every page', async () => {
+    const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
+    const groupId = created.json().group.id;
+    const numbers = Array.from({ length: 20 }, (_, i) => `+1555000${String(i).padStart(4, '0')}`);
+    for (const From of numbers) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/twilio/inbound',
+        payload: { From, Body: 'DRAGON' },
+      });
+    }
+    const page = async (offset: number) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/api/groups/${groupId}/members?offset=${offset}&limit=15`,
+        })
+      ).json();
+
+    const first = await page(0);
+    const second = await page(15);
+    expect(first.members).toHaveLength(15);
+    expect(second.members).toHaveLength(5);
+    expect([...first.members, ...second.members].map((m) => m.phoneNumber)).toEqual(numbers);
+    expect(first).toMatchObject({ total: 20, matched: 20 });
+    expect(second).toMatchObject({ total: 20, matched: 20 });
+  });
+
+  it('filters by name or by phone number, with or without formatting', async () => {
+    const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
+    const groupId = created.json().group.id;
+    for (const From of ['+15092097297', '+14356501780', '+12087051327']) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/twilio/inbound',
+        payload: { From, Body: 'DRAGON' },
+      });
+    }
+    const ada = await database.collections.members.findOne({ phoneNumber: '+14356501780' });
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/members/${ada!._id.toHexString()}`,
+      payload: { name: 'Ada Lovelace (1815)' },
+    });
+    const search = async (q: string) => {
+      const res = (
+        await app.inject({
+          method: 'GET',
+          url: `/api/groups/${groupId}/members?q=${encodeURIComponent(q)}`,
+        })
+      ).json();
+      expect(res.total).toBe(3); // the full count ignores the filter
+      return res.members.map((m: { phoneNumber: string }) => m.phoneNumber);
+    };
+
+    expect(await search('(509) 209-7297')).toEqual(['+15092097297']);
+    expect(await search('509-209')).toEqual(['+15092097297']);
+    expect(await search('+1 208')).toEqual(['+12087051327']);
+    expect(await search('2097297')).toEqual(['+15092097297']);
+    expect(await search('lovelace')).toEqual(['+14356501780']);
+    // Regex characters in a name are matched literally.
+    expect(await search('(1815)')).toEqual(['+14356501780']);
+    expect(await search('Nobody')).toEqual([]);
   });
 
   it('broadcasts to subscribed members', async () => {

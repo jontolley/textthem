@@ -1,6 +1,8 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef } from 'react';
 import {
+  keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -10,6 +12,7 @@ import {
 import type {
   ChangeTopic,
   CreateGroupRequest,
+  SubscriptionStatus,
   UpdateGroupRequest,
   UpdateScheduledBroadcastRequest,
 } from '@text-them/shared';
@@ -38,12 +41,26 @@ export function useGroup(id: string) {
   });
 }
 
-/** A group's current members and the people who left it. */
-export function useGroupMembers(id: string) {
+/** How many members each request fetches as a list scrolls. */
+export const MEMBER_PAGE_SIZE = 15;
+
+/**
+ * A group's current members (`subscribed`) or the people who left it
+ * (`unsubscribed`), fetched a page at a time and optionally filtered by `q`.
+ */
+export function useGroupMembers(id: string, status: SubscriptionStatus, q: string) {
   const api = useApiClient();
-  return useQuery({
-    queryKey: ['groups', id, 'members'],
-    queryFn: () => api.listGroupMembers(id),
+  return useInfiniteQuery({
+    queryKey: ['groups', id, 'members', status, q],
+    queryFn: ({ pageParam }) =>
+      api.listGroupMembers(id, { status, q, offset: pageParam, limit: MEMBER_PAGE_SIZE }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.members.length, 0);
+      return loaded < last.matched ? loaded : undefined;
+    },
+    // Keep the current rows on screen while a new filter loads.
+    placeholderData: keepPreviousData,
   });
 }
 
