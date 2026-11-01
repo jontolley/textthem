@@ -29,12 +29,17 @@ export function serializeMember(doc: MemberDoc): Member {
   };
 }
 
-export function serializeMessage(doc: MessageDoc, delivery?: DeliveryStats): BroadcastMessage {
+export function serializeMessage(
+  doc: MessageDoc,
+  delivery?: DeliveryStats,
+  sentByName?: string,
+): BroadcastMessage {
   return {
     id: doc._id.toHexString(),
     groupId: doc.groupId.toHexString(),
     body: doc.body,
     sentByUserId: doc.sentByUserId,
+    sentByName,
     status: doc.status ?? 'sent',
     scheduledFor: doc.scheduledFor?.toISOString(),
     recipientCount: doc.recipientCount,

@@ -96,6 +96,8 @@ export interface BroadcastMessage {
   groupId: string;
   body: string;
   sentByUserId: string;
+  /** The sender's name from Clerk; absent if the lookup failed. */
+  sentByName?: string;
   status: BroadcastStatus;
   /** When it was scheduled to go out (scheduled broadcasts only). */
   scheduledFor?: string;
@@ -194,8 +196,24 @@ export interface ListGroupMembersResponse {
   matched: number;
 }
 
+/**
+ * Query for one page of broadcasts (`GET /api/messages`). `scheduled` lists
+ * broadcasts still waiting to go out, soonest first; `history` lists the rest
+ * (sent, canceled, missed, …), most recent first.
+ */
+export interface ListMessagesQuery {
+  list?: 'scheduled' | 'history';
+  /** Only this group's broadcasts. */
+  groupId?: string;
+  offset?: number;
+  limit?: number;
+}
+
 export interface ListMessagesResponse {
+  /** This page. */
   messages: BroadcastMessage[];
+  /** Everything in the list. */
+  total: number;
 }
 
 export interface ListInboundMessagesResponse {

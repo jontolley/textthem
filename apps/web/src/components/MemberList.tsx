@@ -3,6 +3,7 @@ import { ListFilter } from 'lucide-react';
 import { toast } from 'sonner';
 import type { GroupMember, SubscriptionStatus } from '@text-them/shared';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
+import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -80,20 +81,13 @@ export function MemberListCard({
       .filter((m) => !seen.has(m.memberId) && seen.add(m.memberId));
   }, [data]);
 
-  // Fetch the next page when the end of the list scrolls into view.
-  const scroller = useRef<HTMLDivElement>(null);
-  const sentinel = useRef<HTMLTableRowElement>(null);
-  useEffect(() => {
-    if (!open || !hasNextPage || isFetchingNextPage || !sentinel.current) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) void fetchNextPage();
-      },
-      { root: scroller.current, rootMargin: '0px 0px 120px 0px' },
-    );
-    observer.observe(sentinel.current);
-    return () => observer.disconnect();
-  }, [open, hasNextPage, isFetchingNextPage, fetchNextPage, rows.length]);
+  const { scroller, sentinel, maxHeight } = useScrollingList({
+    rowCount: rows.length,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    enabled: open,
+  });
 
   function closeFilter() {
     setFilterOpen(false);
@@ -167,17 +161,13 @@ export function MemberListCard({
             <p className="text-sm text-muted-foreground">No one matches &ldquo;{q}&rdquo;.</p>
           )}
           {total > 0 && rows.length > 0 && (
-            <Table
-              containerRef={scroller}
-              // The header plus ten rows; anything more scrolls under the sticky header.
-              containerClassName="max-h-[451px] overflow-y-auto"
-            >
+            <Table containerRef={scroller} containerStyle={{ maxHeight }}>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="sticky top-0 z-10 bg-card">Phone number</TableHead>
-                  <TableHead className="sticky top-0 z-10 bg-card">Name</TableHead>
+                  <TableHead className={STICKY_HEAD}>Phone number</TableHead>
+                  <TableHead className={STICKY_HEAD}>Name</TableHead>
                   {dateColumns.map((c) => (
-                    <TableHead key={c.label} className="sticky top-0 z-10 bg-card">
+                    <TableHead key={c.label} className={STICKY_HEAD}>
                       {c.label}
                     </TableHead>
                   ))}
@@ -200,11 +190,11 @@ export function MemberListCard({
                   </TableRow>
                 ))}
                 {hasNextPage && (
-                  <TableRow ref={sentinel} className="hover:bg-transparent">
-                    <TableCell colSpan={columnCount} className="text-xs text-muted-foreground">
-                      {isFetchingNextPage ? 'Loading more…' : ''}
-                    </TableCell>
-                  </TableRow>
+                  <LoadMoreRow
+                    sentinel={sentinel}
+                    columns={columnCount}
+                    loading={isFetchingNextPage}
+                  />
                 )}
               </TableBody>
             </Table>

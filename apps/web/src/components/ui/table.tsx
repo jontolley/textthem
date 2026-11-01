@@ -6,10 +6,15 @@ const Table = React.forwardRef<
   React.HTMLAttributes<HTMLTableElement> & {
     /** Classes for the scrolling wrapper, e.g. a max height so the rows scroll under a sticky header. */
     containerClassName?: string;
+    containerStyle?: React.CSSProperties;
     containerRef?: React.Ref<HTMLDivElement>;
   }
->(({ className, containerClassName, containerRef, ...props }, ref) => (
-  <div ref={containerRef} className={cn('relative w-full overflow-auto', containerClassName)}>
+>(({ className, containerClassName, containerStyle, containerRef, ...props }, ref) => (
+  <div
+    ref={containerRef}
+    className={cn('relative w-full overflow-auto', containerClassName)}
+    style={containerStyle}
+  >
     <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
   </div>
 ));

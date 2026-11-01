@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { CalendarClock, Pencil, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronRight, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BroadcastMessage } from '@text-them/shared';
+import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -26,10 +28,11 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
 import { formatDateTime, toLocalInputValue } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import {
   useCancelScheduledBroadcast,
   useGroups,
-  useMessages,
+  useMessageList,
   useUpdateScheduledBroadcast,
 } from '@/lib/hooks';
 
@@ -184,13 +187,155 @@ function EditScheduledDialog({
   );
 }
 
-function ScheduledCard({
-  messages,
+/** Flattens a paged list, dropping repeats (offset pages can overlap as broadcasts come and go). */
+function useRows(pages: { messages: BroadcastMessage[] }[] | undefined) {
+  return useMemo(() => {
+    const seen = new Set<string>();
+    return (pages ?? [])
+      .flatMap((p) => p.messages)
+      .filter((m) => !seen.has(m.id) && seen.add(m.id));
+  }, [pages]);
+}
+
+/**
+ * Column widths shared by the Scheduled and History tables, so their first
+ * four columns line up. The message column takes what's left.
+ */
+const COLUMNS = {
+  when: 'w-64',
+  group: 'w-40',
+  sentBy: 'w-36',
+  last: 'w-64 text-right',
+};
+
+/**
+ * One of a list's broadcasts, as a table and its paging. The card folds away
+ * behind its title, which shows the full count.
+ */
+function BroadcastListCard({
+  id,
+  title,
+  list,
+  defaultOpen,
+  whenLabel,
+  lastLabel,
   groupName,
+  renderLast,
 }: {
-  messages: BroadcastMessage[];
+  id: string;
+  title: string;
+  list: 'scheduled' | 'history';
+  defaultOpen: boolean;
+  whenLabel: string;
+  lastLabel: string;
   groupName: (id: string) => string;
+  /** The last column: actions for scheduled broadcasts, delivery for the rest. */
+  renderLast: (m: BroadcastMessage) => React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useMessageList(list);
+  const messages = useRows(data?.pages);
+  const total = data?.pages[0]?.total ?? 0;
+  const { scroller, sentinel, maxHeight } = useScrollingList({
+    rowCount: messages.length,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    enabled: open,
+  });
+  // Rows opened to show their whole message.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggle = (messageId: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(messageId)) next.add(messageId);
+      return next;
+    });
+
+  if (total === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <CollapsibleToggle
+            id={id}
+            title={title}
+            count={total}
+            open={open}
+            onToggle={() => setOpen((v) => !v)}
+          />
+        </CardTitle>
+      </CardHeader>
+      {open && (
+        <CardContent id={id}>
+          <Table className="table-fixed" containerRef={scroller} containerStyle={{ maxHeight }}>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className={cn(STICKY_HEAD, COLUMNS.when)}>{whenLabel}</TableHead>
+                <TableHead className={cn(STICKY_HEAD, COLUMNS.group)}>Group</TableHead>
+                <TableHead className={cn(STICKY_HEAD, COLUMNS.sentBy)}>Sent by</TableHead>
+                <TableHead className={STICKY_HEAD}>Message</TableHead>
+                <TableHead className={cn(STICKY_HEAD, COLUMNS.last)}>{lastLabel}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {messages.map((m) => {
+                // Scheduled ones show when they'll go; unsent ones (canceled, missed) when they were due.
+                const when = list === 'scheduled' ? m.scheduledFor : (m.sentAt ?? m.scheduledFor);
+                const rowOpen = expanded.has(m.id);
+                return (
+                  // Click (or Enter/Space) shows the whole message; again folds it back.
+                  <TableRow
+                    key={m.id}
+                    tabIndex={0}
+                    aria-expanded={rowOpen}
+                    // Cells stay vertically centered when it opens, so a short message doesn't shift.
+                    className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    onClick={(e) => {
+                      // Links and buttons in the row (Twilio errors, Edit, Cancel) do their own thing.
+                      if (!(e.target as HTMLElement).closest('a, button')) toggle(m.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggle(m.id);
+                      }
+                    }}
+                  >
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      <ChevronRight
+                        className={cn(
+                          'mr-1 inline h-4 w-4 align-[-3px] transition-transform',
+                          rowOpen && 'rotate-90',
+                        )}
+                        aria-hidden
+                      />
+                      {when ? formatDateTime(when) : '—'}
+                    </TableCell>
+                    <TableCell>{groupName(m.groupId)}</TableCell>
+                    <TableCell className="truncate">{m.sentByName ?? '—'}</TableCell>
+                    <TableCell className={rowOpen ? 'whitespace-pre-wrap break-words' : 'truncate'}>
+                      {m.body}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right">{renderLast(m)}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {hasNextPage && (
+                <LoadMoreRow sentinel={sentinel} columns={5} loading={isFetchingNextPage} />
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+/** Broadcasts still to go out, soonest first, each with Edit and Cancel. */
+function ScheduledCard({ groupName }: { groupName: (id: string) => string }) {
   const cancel = useCancelScheduledBroadcast();
   const [editing, setEditing] = useState<BroadcastMessage | null>(null);
   const [canceling, setCanceling] = useState<BroadcastMessage | null>(null);
@@ -205,48 +350,31 @@ function ScheduledCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarClock className="h-5 w-5" /> Scheduled
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Sends</TableHead>
-              <TableHead>Group</TableHead>
-              <TableHead>Message</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {messages.map((m) => (
-              <TableRow key={m.id}>
-                <TableCell className="whitespace-nowrap font-medium">
-                  {m.scheduledFor && formatDateTime(m.scheduledFor)}
-                </TableCell>
-                <TableCell>{groupName(m.groupId)}</TableCell>
-                <TableCell className="max-w-md truncate">{m.body}</TableCell>
-                <TableCell className="whitespace-nowrap text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
-                    <Pencil className="h-4 w-4" /> Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setCanceling(m)}
-                    disabled={cancel.isPending}
-                  >
-                    <X className="h-4 w-4" /> Cancel
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
+    <>
+      <BroadcastListCard
+        id="scheduled-list"
+        title="Scheduled"
+        list="scheduled"
+        defaultOpen
+        whenLabel="Sends"
+        lastLabel="Actions"
+        groupName={groupName}
+        renderLast={(m) => (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
+              <Pencil className="h-4 w-4" /> Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCanceling(m)}
+              disabled={cancel.isPending}
+            >
+              <X className="h-4 w-4" /> Cancel
+            </Button>
+          </>
+        )}
+      />
       {editing && (
         <EditScheduledDialog
           key={editing.id}
@@ -268,17 +396,19 @@ function ScheduledCard({
           onConfirm={() => handleCancel(canceling)}
         />
       )}
-    </Card>
+    </>
   );
 }
 
 export function HistoryPage() {
-  const { data: messages, isLoading } = useMessages();
+  // The cards fetch their own lists; these (shared through the query cache) decide the page's state.
+  const scheduled = useMessageList('scheduled');
+  const past = useMessageList('history');
   const { data: groups } = useGroups();
   const groupName = (id: string) => groups?.find((g) => g.id === id)?.name ?? 'Unknown group';
-
-  const upcoming = messages?.filter((m) => m.status === 'scheduled') ?? [];
-  const past = messages?.filter((m) => m.status !== 'scheduled') ?? [];
+  const scheduledTotal = scheduled.data?.pages[0]?.total;
+  const pastTotal = past.data?.pages[0]?.total;
+  const loaded = scheduledTotal !== undefined && pastTotal !== undefined;
 
   return (
     <div className="space-y-6">
@@ -289,9 +419,11 @@ export function HistoryPage() {
         </p>
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {(scheduled.isLoading || past.isLoading) && (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      )}
 
-      {messages && messages.length === 0 && (
+      {loaded && scheduledTotal === 0 && pastTotal === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
             No broadcasts sent yet.
@@ -299,41 +431,21 @@ export function HistoryPage() {
         </Card>
       )}
 
-      {upcoming.length > 0 && <ScheduledCard messages={upcoming} groupName={groupName} />}
-
-      {past.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Sent</TableHead>
-                  <TableHead>Group</TableHead>
-                  <TableHead>Message</TableHead>
-                  <TableHead className="text-right">Delivery</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {past.map((m) => {
-                  // Unsent broadcasts (canceled, missed) show when they were due.
-                  const when = m.sentAt ?? m.scheduledFor;
-                  return (
-                    <TableRow key={m.id}>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {when ? formatDateTime(when) : '—'}
-                      </TableCell>
-                      <TableCell>{groupName(m.groupId)}</TableCell>
-                      <TableCell className="max-w-md truncate">{m.body}</TableCell>
-                      <TableCell className="whitespace-nowrap text-right">
-                        <OutcomeSummary message={m} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      {/* Rendered once both counts are in, since History starts folded when anything is scheduled. */}
+      {loaded && (
+        <>
+          <ScheduledCard groupName={groupName} />
+          <BroadcastListCard
+            id="history-list"
+            title="History"
+            list="history"
+            defaultOpen={scheduledTotal === 0}
+            whenLabel="Sent"
+            lastLabel="Delivery"
+            groupName={groupName}
+            renderLast={(m) => <OutcomeSummary message={m} />}
+          />
+        </>
       )}
     </div>
   );

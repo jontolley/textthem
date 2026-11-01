@@ -17,6 +17,7 @@ import { HttpError } from './errors.js';
 import { startScheduler, type Scheduler } from './services/broadcasts.js';
 import { createChangeNotifier, type ChangeNotifier } from './services/events.js';
 import type { TwilioService } from './services/twilio.js';
+import { clerkUserDirectory, type UserDirectory } from './services/users.js';
 import type { AppConfig } from './config.js';
 
 export interface BuildAppOptions {
@@ -26,6 +27,8 @@ export interface BuildAppOptions {
   database?: Database;
   /** Override the authenticator (tests inject a stub). */
   authenticator?: Authenticator;
+  /** Override how broadcast senders' names are looked up (tests inject a stub). */
+  users?: UserDirectory;
   /**
    * Check for due scheduled broadcasts this often (production). Left unset in
    * tests, which run the scheduler pass directly.
@@ -112,7 +115,11 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     }
     await scope.register(groupRoutes);
     await scope.register(memberRoutes);
-    await scope.register(messageRoutes, { twilio: opts.twilio, statusCallbackUrl });
+    await scope.register(messageRoutes, {
+      twilio: opts.twilio,
+      statusCallbackUrl,
+      users: opts.users ?? (usingClerk ? clerkUserDirectory(app.log) : async () => new Map()),
+    });
     await scope.register(inboundRoutes);
     await scope.register(versionRoutes, { commit: config.GIT_SHA, builtAt: config.BUILT_AT });
     await scope.register(meRoutes);

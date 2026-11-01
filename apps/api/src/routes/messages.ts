@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Filter } from 'mongodb';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { BroadcastResponse, ListMessagesResponse } from '@text-them/shared';
@@ -8,6 +8,7 @@ import type { MessageDoc } from '../db/documents.js';
 import { deliveryStats } from '../services/deliveries.js';
 import { sendBroadcast } from '../services/broadcasts.js';
 import type { TwilioService } from '../services/twilio.js';
+import type { UserDirectory } from '../services/users.js';
 
 /** Scheduled times must leave the scheduler a moment to pick them up. */
 const MIN_LEAD_MS = 60 * 1000;
@@ -31,6 +32,17 @@ const broadcastSchema = z.object({
   sendAt: sendAtSchema.optional(),
 });
 
+const listMessagesSchema = z.object({
+  list: z.enum(['scheduled', 'history']).default('history'),
+  groupId: z
+    .string()
+    .refine((v) => ObjectId.isValid(v), 'Invalid group id')
+    .transform((v) => new ObjectId(v))
+    .optional(),
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(15),
+});
+
 const updateScheduledSchema = z
   .object({ body: bodySchema.optional(), sendAt: sendAtSchema.optional() })
   .refine((v) => v.body !== undefined || v.sendAt !== undefined, {
@@ -46,6 +58,8 @@ export interface MessageRoutesDeps {
   twilio: TwilioService;
   /** Absolute URL of the Twilio status-callback route. */
   statusCallbackUrl: string;
+  /** Names each broadcast's sender. */
+  users: UserDirectory;
 }
 
 export async function messageRoutes(
@@ -57,9 +71,20 @@ export async function messageRoutes(
 
   fastify.addHook('preHandler', fastify.requireAuth);
 
+  /** Serializes broadcasts with their delivery stats and senders' names. */
+  async function serialize(docs: MessageDoc[]) {
+    const [stats, names] = await Promise.all([
+      deliveryStats(deliveries, docs),
+      deps.users(docs.map((d) => d.sentByUserId)),
+    ]);
+    return docs.map((d) =>
+      serializeMessage(d, stats.get(d._id.toHexString()), names.get(d.sentByUserId)),
+    );
+  }
+
   async function respond(doc: MessageDoc): Promise<BroadcastResponse> {
-    const stats = await deliveryStats(deliveries, [doc]);
-    return { message: serializeMessage(doc, stats.get(doc._id.toHexString())) };
+    const [message] = await serialize([doc]);
+    return { message };
   }
 
   /** Applies `update` only while the broadcast is still scheduled. */
@@ -137,22 +162,26 @@ export async function messageRoutes(
     },
   );
 
-  // Upcoming broadcasts first (soonest first), then the latest 200 others.
-  fastify.get('/api/messages', async (): Promise<ListMessagesResponse> => {
-    const upcoming = await messages.find({ status: 'scheduled' }).sort({ scheduledFor: 1 }).toArray();
-    const past = await messages
+  // One page of the scheduled broadcasts (soonest first) or of the rest (most recent first).
+  fastify.get('/api/messages', async (request): Promise<ListMessagesResponse> => {
+    const { list, groupId, offset, limit } = listMessagesSchema.parse(request.query);
+    const match: Filter<MessageDoc> = {
+      status: list === 'scheduled' ? 'scheduled' : { $ne: 'scheduled' },
+      ...(groupId ? { groupId } : {}),
+    };
+    const docs = await messages
       .aggregate<MessageDoc>([
-        { $match: { status: { $ne: 'scheduled' } } },
+        { $match: match },
         // Unsent broadcasts (canceled, missed, …) sort by when they were due.
         { $addFields: { sortAt: { $ifNull: ['$sentAt', '$sendingStartedAt', '$scheduledFor'] } } },
-        { $sort: { sortAt: -1 } },
-        { $limit: 200 },
+        { $sort: list === 'scheduled' ? { sortAt: 1, _id: 1 } : { sortAt: -1, _id: -1 } },
+        { $skip: offset },
+        { $limit: limit },
         { $project: { sortAt: 0 } },
       ])
       .toArray();
+    const total = await messages.countDocuments(match);
 
-    const docs = [...upcoming, ...past];
-    const stats = await deliveryStats(deliveries, docs);
-    return { messages: docs.map((d) => serializeMessage(d, stats.get(d._id.toHexString()))) };
+    return { messages: await serialize(docs), total };
   });
 }

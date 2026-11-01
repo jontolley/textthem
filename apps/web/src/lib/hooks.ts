@@ -41,9 +41,6 @@ export function useGroup(id: string) {
   });
 }
 
-/** How many members each request fetches as a list scrolls. */
-export const MEMBER_PAGE_SIZE = 15;
-
 /**
  * A group's current members (`subscribed`) or the people who left it
  * (`unsubscribed`), fetched a page at a time and optionally filtered by `q`.
@@ -53,7 +50,7 @@ export function useGroupMembers(id: string, status: SubscriptionStatus, q: strin
   return useInfiniteQuery({
     queryKey: ['groups', id, 'members', status, q],
     queryFn: ({ pageParam }) =>
-      api.listGroupMembers(id, { status, q, offset: pageParam, limit: MEMBER_PAGE_SIZE }),
+      api.listGroupMembers(id, { status, q, offset: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, p) => n + p.members.length, 0);
@@ -64,11 +61,33 @@ export function useGroupMembers(id: string, status: SubscriptionStatus, q: strin
   });
 }
 
-export function useMessages() {
+/** How many rows each request fetches as a list scrolls. */
+export const PAGE_SIZE = 15;
+
+/**
+ * Scheduled broadcasts (soonest first) or the rest (most recent first),
+ * fetched a page at a time.
+ */
+export function useMessageList(list: 'scheduled' | 'history') {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: ['messages', list],
+    queryFn: ({ pageParam }) => api.listMessages({ list, offset: pageParam, limit: PAGE_SIZE }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.messages.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
+  });
+}
+
+/** One group's scheduled broadcasts, soonest first (up to 100). */
+export function useGroupScheduled(groupId: string) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['messages'],
-    queryFn: () => api.listMessages().then((r) => r.messages),
+    queryKey: ['messages', 'scheduled', groupId],
+    queryFn: () =>
+      api.listMessages({ list: 'scheduled', groupId, limit: 100 }).then((r) => r.messages),
   });
 }
 

@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { BroadcastMessage } from '@text-them/shared';
-import { useBroadcast, useDeleteGroup, useGroup, useMessages } from '@/lib/hooks';
+import { useBroadcast, useDeleteGroup, useGroup, useGroupScheduled } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
 
@@ -29,9 +29,8 @@ export function GroupDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { data: group, isLoading } = useGroup(id);
-  const { data: messages } = useMessages();
   // The API lists scheduled broadcasts soonest first.
-  const scheduled = messages?.filter((m) => m.groupId === id && m.status === 'scheduled') ?? [];
+  const { data: scheduled = [] } = useGroupScheduled(id);
   const broadcast = useBroadcast(id);
   const deleteGroup = useDeleteGroup();
   const [body, setBody] = useState('');

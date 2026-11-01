@@ -6,6 +6,7 @@ import type {
   ListGroupMembersResponse,
   ListInboundMessagesResponse,
   ListGroupsResponse,
+  ListMessagesQuery,
   ListMessagesResponse,
   MeResponse,
   MemberResponse,
@@ -64,13 +65,8 @@ export function createApiClient(getToken: TokenGetter) {
       request<GroupResponse>(`/api/groups/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     deleteGroup: (id: string) => request<void>(`/api/groups/${id}`, { method: 'DELETE' }),
     /** One page of a group's members, or of the people who left. */
-    listGroupMembers: (id: string, query: ListGroupMembersQuery) => {
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined && value !== '') params.set(key, String(value));
-      }
-      return request<ListGroupMembersResponse>(`/api/groups/${id}/members?${params}`);
-    },
+    listGroupMembers: (id: string, query: ListGroupMembersQuery) =>
+      request<ListGroupMembersResponse>(`/api/groups/${id}/members?${toParams(query)}`),
     /** An empty name clears it. */
     updateMember: (id: string, name: string) =>
       request<MemberResponse>(`/api/members/${id}`, {
@@ -83,7 +79,9 @@ export function createApiClient(getToken: TokenGetter) {
         method: 'POST',
         body: JSON.stringify({ body, sendAt }),
       }),
-    listMessages: () => request<ListMessagesResponse>('/api/messages'),
+    /** One page of scheduled broadcasts, or of the rest. */
+    listMessages: (query: ListMessagesQuery) =>
+      request<ListMessagesResponse>(`/api/messages?${toParams(query)}`),
     updateScheduledBroadcast: (id: string, body: UpdateScheduledBroadcastRequest) =>
       request<BroadcastResponse>(`/api/messages/${id}`, {
         method: 'PATCH',
@@ -95,6 +93,15 @@ export function createApiClient(getToken: TokenGetter) {
     getVersion: () => request<VersionResponse>('/api/version'),
     getMe: () => request<MeResponse>('/api/me'),
   };
+}
+
+/** A query string from the set values (empty ones are left out). */
+function toParams(query: object): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  }
+  return params;
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;

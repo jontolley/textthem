@@ -59,6 +59,7 @@ beforeAll(async () => {
     twilio: fakeTwilio,
     database,
     authenticator: () => 'user_123',
+    users: async (ids) => new Map(ids.filter((id) => id === 'user_123').map((id) => [id, 'Jon T'])),
     fastifyOptions: { logger: false },
   });
   await app.ready();
@@ -126,8 +127,11 @@ async function schedule(groupId: ObjectId, sendAt: Date, body = 'Hello later'): 
   return res.json().message;
 }
 
+/** Scheduled broadcasts, then the rest (first page of each). */
 async function listMessages(): Promise<BroadcastMessage[]> {
-  return (await app.inject({ method: 'GET', url: '/api/messages' })).json().messages;
+  const list = async (name: string) =>
+    (await app.inject({ method: 'GET', url: `/api/messages?list=${name}` })).json().messages;
+  return [...(await list('scheduled')), ...(await list('history'))];
 }
 
 async function statusOf(id: string) {
@@ -143,6 +147,69 @@ describe('scheduled broadcasts', () => {
     expect(res.json().message).toMatchObject({ status: 'sent', recipientCount: 1, acceptedCount: 1 });
     expect(res.json().message.sentAt).toBeDefined();
     expect(sendCalls).toHaveLength(1);
+  });
+
+  it("names who sent each broadcast, and leaves the name out when it can't be found", async () => {
+    const groupId = await seedGroup(['+15550000001']);
+    const res = await postBroadcast(groupId, { body: 'Now!' });
+    expect(res.json().message).toMatchObject({ sentByUserId: 'user_123', sentByName: 'Jon T' });
+
+    await database.collections.messages.insertOne({
+      _id: new ObjectId(),
+      groupId,
+      body: 'From someone since removed',
+      sentByUserId: 'user_gone',
+      status: 'sent',
+      sentAt: new Date(),
+      recipientCount: 0,
+      acceptedCount: 0,
+      failedCount: 0,
+    });
+    const messages = await listMessages();
+    expect(messages.find((m) => m.body === 'Now!')?.sentByName).toBe('Jon T');
+    const gone = messages.find((m) => m.body === 'From someone since removed');
+    expect(gone?.sentByName).toBeUndefined();
+  });
+
+  it('pages each list in order, and can narrow it to one group', async () => {
+    const dragons = await seedGroup([]);
+    const tigers = new ObjectId(); // only ever filtered on, so it needs no group doc
+    const base = Date.now();
+    const insert = (groupId: ObjectId, i: number, scheduled: boolean) =>
+      database.collections.messages.insertOne({
+        _id: new ObjectId(),
+        groupId,
+        body: `${scheduled ? 'later' : 'sent'} ${i}`,
+        sentByUserId: 'user_123',
+        recipientCount: 0,
+        acceptedCount: 0,
+        failedCount: 0,
+        ...(scheduled
+          ? { status: 'scheduled' as const, scheduledFor: new Date(base + (i + 1) * 60 * MINUTE) }
+          : { status: 'sent' as const, sentAt: new Date(base - (i + 1) * 60 * MINUTE) }),
+      });
+    for (let i = 0; i < 20; i++) await insert(dragons, i, false);
+    for (let i = 0; i < 3; i++) await insert(dragons, i, true);
+    await insert(tigers, 99, true);
+    const page = async (query: string) =>
+      (await app.inject({ method: 'GET', url: `/api/messages?${query}` })).json();
+
+    const first = await page('list=history');
+    const second = await page('list=history&offset=15');
+    expect(first.total).toBe(20);
+    expect([...first.messages, ...second.messages].map((m: BroadcastMessage) => m.body)).toEqual(
+      Array.from({ length: 20 }, (_, i) => `sent ${i}`), // most recent first
+    );
+
+    const scheduled = await page('list=scheduled');
+    expect(scheduled.messages.map((m: BroadcastMessage) => m.body)).toEqual([
+      'later 0',
+      'later 1',
+      'later 2',
+      'later 99',
+    ]);
+    const tigersOnly = await page(`list=scheduled&groupId=${tigers.toHexString()}`);
+    expect(tigersOnly).toMatchObject({ total: 1, messages: [{ body: 'later 99' }] });
   });
 
   it('schedules without sending anything', async () => {
