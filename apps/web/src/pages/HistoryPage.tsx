@@ -209,8 +209,8 @@ const COLUMNS = {
 };
 
 /**
- * One of a list's broadcasts, as a table and its paging. The card folds away
- * behind its title, which shows the full count.
+ * One of a list's broadcasts, as a table and its paging: five rows show, the
+ * rest scroll. The card folds away behind its title, which shows the full count.
  */
 function BroadcastListCard({
   id,
@@ -242,6 +242,7 @@ function BroadcastListCard({
     isFetchingNextPage,
     fetchNextPage,
     enabled: open,
+    visibleRows: 5,
   });
   // Rows opened to show their whole message.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());

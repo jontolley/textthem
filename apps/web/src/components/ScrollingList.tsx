@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 
-/** How many rows a scrolling list shows before it scrolls. */
-const VISIBLE_ROWS = 10;
+/** How many rows a scrolling list shows before it scrolls, unless it asks for another number. */
+const DEFAULT_VISIBLE_ROWS = 10;
 
 /**
- * For a table that loads a page at a time: caps its height at ten rows (so
+ * For a table that loads a page at a time: caps its height at `visibleRows` (so
  * the rest scrolls under a sticky header) and fetches the next page when its
  * last row scrolls into view. Pass `scroller` as the Table's `containerRef`,
- * `maxHeight` as its container style, and render `<LoadMoreRow ref={sentinel}>`
+ * `maxHeight` as its container style, and render `<LoadMoreRow sentinel={sentinel}>`
  * last while there's more to fetch.
  */
 export function useScrollingList({
@@ -17,6 +17,7 @@ export function useScrollingList({
   isFetchingNextPage,
   fetchNextPage,
   enabled = true,
+  visibleRows = DEFAULT_VISIBLE_ROWS,
 }: {
   rowCount: number;
   hasNextPage: boolean;
@@ -24,6 +25,8 @@ export function useScrollingList({
   fetchNextPage: () => unknown;
   /** False while the list is hidden (e.g. a collapsed card). */
   enabled?: boolean;
+  /** Rows shown before it scrolls (10 by default). */
+  visibleRows?: number;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLTableRowElement>(null);
@@ -36,14 +39,14 @@ export function useScrollingList({
       const box = scroller.current;
       const rows = box?.querySelectorAll('tbody > tr:not([data-load-more])');
       const head = box?.querySelector('thead');
-      if (!box || !rows || !head || rows.length <= VISIBLE_ROWS) return setMaxHeight(undefined);
-      const bottom = rows[VISIBLE_ROWS - 1].getBoundingClientRect().bottom;
+      if (!box || !rows || !head || rows.length <= visibleRows) return setMaxHeight(undefined);
+      const bottom = rows[visibleRows - 1].getBoundingClientRect().bottom;
       setMaxHeight(Math.ceil(bottom - head.getBoundingClientRect().top));
     };
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [rowCount, enabled]);
+  }, [rowCount, enabled, visibleRows]);
 
   useEffect(() => {
     if (!enabled || !hasNextPage || isFetchingNextPage || !sentinel.current) return;
