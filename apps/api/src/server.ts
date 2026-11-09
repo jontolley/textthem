@@ -1,11 +1,17 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
+import { createMediaStore } from './services/media.js';
 import { createTwilioService } from './services/twilio.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const twilio = createTwilioService(config);
-  const app = await buildApp({ config, twilio, schedulerIntervalMs: 30_000 });
+  const app = await buildApp({
+    config,
+    twilio,
+    media: createMediaStore(config),
+    schedulerIntervalMs: 30_000,
+  });
 
   const close = async () => {
     await app.close();

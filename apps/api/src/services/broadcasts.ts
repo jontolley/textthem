@@ -34,6 +34,7 @@ export async function sendBroadcast(deps: BroadcastDeps, broadcast: MessageDoc):
     recipients.length > 0
       ? await deps.twilio.sendBulk(recipients, broadcast.body, {
           statusCallback: deps.statusCallbackUrl,
+          ...(broadcast.mediaUrl ? { mediaUrl: broadcast.mediaUrl } : {}),
         })
       : { accepted: [], failed: 0 };
   await recordSends(deliveries, broadcast._id, accepted);

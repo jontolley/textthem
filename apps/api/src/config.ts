@@ -4,6 +4,14 @@ import { z } from 'zod';
  * Parses and validates process environment into a typed config object.
  * Throws on startup if required variables are missing/invalid.
  */
+const R2_KEYS = [
+  'R2_ACCOUNT_ID',
+  'R2_ACCESS_KEY_ID',
+  'R2_SECRET_ACCESS_KEY',
+  'R2_BUCKET',
+  'R2_PUBLIC_URL',
+] as const;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(8080),
@@ -43,12 +51,27 @@ const envSchema = z.object({
     .string()
     .default('')
     .transform((v) => v.split(',').map((id) => id.trim()).filter(Boolean)),
+
+  // Cloudflare R2 bucket for broadcast images (MMS). Set all five or none. With
+  // none, production can't attach images and local dev keeps them in .media/.
+  // R2_PUBLIC_URL is the bucket's public address, e.g. https://media.textthem.app.
+  R2_ACCOUNT_ID: z.string().min(1).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET: z.string().min(1).optional(),
+  R2_PUBLIC_URL: z.string().url().optional(),
 }).refine((env) => env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_FROM_NUMBER, {
   message: 'Set TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER (at least one)',
   path: ['TWILIO_MESSAGING_SERVICE_SID'],
 }).refine((env) => env.NODE_ENV !== 'production' || env.ORGANIZER_USER_IDS.length > 0, {
   message: 'Set ORGANIZER_USER_IDS (comma-separated Clerk user IDs) in production',
   path: ['ORGANIZER_USER_IDS'],
+}).refine((env) => {
+  const set = R2_KEYS.filter((k) => env[k]).length;
+  return set === 0 || set === R2_KEYS.length;
+}, {
+  message: 'Set all of R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET and R2_PUBLIC_URL, or none',
+  path: ['R2_ACCOUNT_ID'],
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -68,5 +91,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       .map((o) => o.trim())
       .filter(Boolean),
     isProduction: data.NODE_ENV === 'production',
+    r2:
+      data.R2_ACCOUNT_ID &&
+      data.R2_ACCESS_KEY_ID &&
+      data.R2_SECRET_ACCESS_KEY &&
+      data.R2_BUCKET &&
+      data.R2_PUBLIC_URL
+        ? {
+            R2_ACCOUNT_ID: data.R2_ACCOUNT_ID,
+            R2_ACCESS_KEY_ID: data.R2_ACCESS_KEY_ID,
+            R2_SECRET_ACCESS_KEY: data.R2_SECRET_ACCESS_KEY,
+            R2_BUCKET: data.R2_BUCKET,
+            R2_PUBLIC_URL: data.R2_PUBLIC_URL,
+          }
+        : undefined,
   };
 }

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, ListFilter, Pencil, X } from 'lucide-react';
+import { ChevronRight, Image as ImageIcon, ListFilter, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BroadcastMessage } from '@text-them/shared';
 import { BroadcastFilterBar, SortableHead, useListView } from '@/components/BroadcastListControls';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ImageAttachment } from '@/components/ImageAttachment';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,7 @@ import { cn } from '@/lib/utils';
 import {
   useCancelScheduledBroadcast,
   useGroups,
+  useMe,
   useMessageList,
   useUpdateScheduledBroadcast,
 } from '@/lib/hooks';
@@ -123,7 +125,10 @@ function EditScheduledDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const update = useUpdateScheduledBroadcast();
+  const { data: me } = useMe();
   const [body, setBody] = useState(message.body);
+  const [mediaUrl, setMediaUrl] = useState(message.mediaUrl);
+  const [uploading, setUploading] = useState(false);
   const [sendAt, setSendAt] = useState(() =>
     toLocalInputValue(new Date(message.scheduledFor ?? Date.now())),
   );
@@ -133,7 +138,12 @@ function EditScheduledDialog({
     try {
       await update.mutateAsync({
         id: message.id,
-        body: { body: body.trim(), sendAt: new Date(sendAt).toISOString() },
+        body: {
+          body: body.trim(),
+          // Only when it changed; null removes it.
+          ...(mediaUrl !== message.mediaUrl ? { mediaUrl: mediaUrl ?? null } : {}),
+          sendAt: new Date(sendAt).toISOString(),
+        },
       });
       toast.success('Scheduled broadcast updated');
       onOpenChange(false);
@@ -161,9 +171,17 @@ function EditScheduledDialog({
                 onChange={(e) => setBody(e.target.value)}
                 maxLength={1600}
                 rows={4}
-                required
+                required={!mediaUrl}
               />
             </div>
+            {/* An image it already has stays editable even if new uploads are off. */}
+            {(me?.canAttachImages || mediaUrl) && (
+              <ImageAttachment
+                value={mediaUrl}
+                onChange={setMediaUrl}
+                onUploadingChange={setUploading}
+              />
+            )}
             <div className="space-y-2">
               <Label htmlFor="edit-send-at">Send at</Label>
               <Input
@@ -178,7 +196,7 @@ function EditScheduledDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={update.isPending}>
+            <Button type="submit" disabled={update.isPending || uploading}>
               {update.isPending ? 'Saving…' : 'Save changes'}
             </Button>
           </DialogFooter>
@@ -382,7 +400,28 @@ function BroadcastListCard({
                       <TableCell
                         className={rowOpen ? 'whitespace-pre-wrap break-words' : 'truncate'}
                       >
-                        {m.body}
+                        {m.mediaUrl && !rowOpen && (
+                          <ImageIcon
+                            className="mr-1.5 inline h-4 w-4 align-[-3px] text-muted-foreground"
+                            aria-label="Has an image"
+                          />
+                        )}
+                        {m.body || (!rowOpen && <span className="text-muted-foreground">Image</span>)}
+                        {m.mediaUrl && rowOpen && (
+                          <a
+                            href={m.mediaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={cn('block w-fit', m.body && 'mt-2')}
+                          >
+                            <img
+                              src={m.mediaUrl}
+                              alt="Image sent with this broadcast"
+                              loading="lazy"
+                              className="max-h-48 max-w-full rounded-md border object-contain"
+                            />
+                          </a>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         {renderLast(m)}

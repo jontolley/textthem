@@ -45,7 +45,7 @@ describe('organizer allowlist', () => {
   it('lets an organizer in and tells the dashboard who they are', async () => {
     const res = await request('user_a,user_b', 'user_b', '/api/me');
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ userId: 'user_b' });
+    expect(res.json()).toEqual({ userId: 'user_b', canAttachImages: false });
   });
 
   it.each(['/api/me', '/api/groups', '/api/messages', '/api/version', '/api/events'])(

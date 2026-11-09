@@ -15,6 +15,7 @@ import type {
   ListMessagesQuery,
   SubscriptionStatus,
   UpdateGroupRequest,
+  BroadcastRequest,
   UpdateScheduledBroadcastRequest,
 } from '@text-them/shared';
 import { createApiClient, type ApiClient } from './api';
@@ -218,8 +219,7 @@ export function useBroadcast(groupId: string) {
   const api = useApiClient();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ body, sendAt }: { body: string; sendAt?: string }) =>
-      api.broadcast(groupId, body, sendAt),
+    mutationFn: (body: BroadcastRequest) => api.broadcast(groupId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
   });
 }
@@ -231,6 +231,14 @@ export function useUpdateScheduledBroadcast() {
     mutationFn: ({ id, body }: { id: string; body: UpdateScheduledBroadcastRequest }) =>
       api.updateScheduledBroadcast(id, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
+  });
+}
+
+/** Uploads a broadcast image; resolves to the URL to send with it. */
+export function useUploadMedia() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: (image: Blob) => api.uploadMedia(image).then((r) => r.mediaUrl),
   });
 }
 

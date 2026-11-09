@@ -44,7 +44,10 @@ export interface SubscriptionDoc {
 export interface MessageDoc {
   _id: ObjectId;
   groupId: ObjectId;
+  /** May be empty when there's an image. */
   body: string;
+  /** Public URL of the attached image (an MMS); see services/media.ts. */
+  mediaUrl?: string;
   sentByUserId: string;
   /** Absent on broadcasts from before scheduling existed, which were all sent. */
   status?: BroadcastStatus;

@@ -38,6 +38,7 @@ export function serializeMessage(
     id: doc._id.toHexString(),
     groupId: doc.groupId.toHexString(),
     body: doc.body,
+    mediaUrl: doc.mediaUrl,
     sentByUserId: doc.sentByUserId,
     sentByName,
     status: doc.status ?? 'sent',

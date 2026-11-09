@@ -31,3 +31,6 @@ coverage/
 # Claude Code: app-made worktrees and personal settings
 .claude/worktrees/
 .claude/settings.local.json
+
+# Broadcast images kept by the API in local dev (no R2)
+.media/

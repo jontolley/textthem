@@ -1,4 +1,5 @@
 import type {
+  BroadcastRequest,
   BroadcastResponse,
   CreateGroupRequest,
   GroupResponse,
@@ -13,6 +14,7 @@ import type {
   MemberResponse,
   UpdateGroupRequest,
   UpdateScheduledBroadcastRequest,
+  UploadMediaResponse,
   VersionResponse,
 } from '@text-them/shared';
 
@@ -75,10 +77,17 @@ export function createApiClient(getToken: TokenGetter) {
         body: JSON.stringify({ name }),
       }),
     /** Sends now, or schedules when `sendAt` (ISO) is given. */
-    broadcast: (id: string, body: string, sendAt?: string) =>
+    broadcast: (id: string, body: BroadcastRequest) =>
       request<BroadcastResponse>(`/api/groups/${id}/broadcast`, {
         method: 'POST',
-        body: JSON.stringify({ body, sendAt }),
+        body: JSON.stringify(body),
+      }),
+    /** Stores a broadcast image (JPEG, PNG or GIF) and returns the URL to send with it. */
+    uploadMedia: (image: Blob) =>
+      request<UploadMediaResponse>('/api/media', {
+        method: 'POST',
+        body: image,
+        headers: { 'Content-Type': image.type },
       }),
     /** One page of scheduled broadcasts, or of the rest. */
     listMessages: (query: ListMessagesQuery) =>

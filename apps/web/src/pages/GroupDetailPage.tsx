@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Image as ImageIcon, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ImageAttachment } from '@/components/ImageAttachment';
 import { MemberListCard } from '@/components/MemberList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { BroadcastMessage } from '@text-them/shared';
-import { useBroadcast, useDeleteGroup, useGroup, useGroupScheduled } from '@/lib/hooks';
+import { useBroadcast, useDeleteGroup, useGroup, useGroupScheduled, useMe } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
 
@@ -33,7 +34,10 @@ export function GroupDetailPage() {
   const { data: scheduled = [] } = useGroupScheduled(id);
   const broadcast = useBroadcast(id);
   const deleteGroup = useDeleteGroup();
+  const { data: me } = useMe();
   const [body, setBody] = useState('');
+  const [mediaUrl, setMediaUrl] = useState<string>();
+  const [uploading, setUploading] = useState(false);
   const [scheduleLater, setScheduleLater] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Local wall-clock time from the datetime-local input, e.g. "2026-10-25T09:00".
@@ -44,6 +48,7 @@ export function GroupDetailPage() {
     try {
       const res = await broadcast.mutateAsync({
         body: body.trim(),
+        mediaUrl,
         // A datetime-local value without an offset parses as the browser's local time.
         sendAt: scheduleLater ? new Date(sendAt).toISOString() : undefined,
       });
@@ -54,6 +59,7 @@ export function GroupDetailPage() {
           : `Queued ${message.acceptedCount} of ${message.recipientCount} texts. Delivery status shows in History.`,
       );
       setBody('');
+      setMediaUrl(undefined);
       setScheduleLater(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Failed to send broadcast');
@@ -127,8 +133,16 @@ export function GroupDetailPage() {
               maxLength={MAX_LENGTH}
               placeholder={`Message to all ${memberCount} subscribed members…`}
               rows={4}
-              required
+              // An image can go on its own.
+              required={!mediaUrl}
             />
+            {me?.canAttachImages && (
+              <ImageAttachment
+                value={mediaUrl}
+                onChange={setMediaUrl}
+                onUploadingChange={setUploading}
+              />
+            )}
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -163,7 +177,9 @@ export function GroupDetailPage() {
               </span>
               <Button
                 type="submit"
-                disabled={broadcast.isPending || (!scheduleLater && memberCount === 0)}
+                disabled={
+                  broadcast.isPending || uploading || (!scheduleLater && memberCount === 0)
+                }
               >
                 {scheduleLater ? (
                   <CalendarClock className="h-4 w-4" />
@@ -255,7 +271,9 @@ function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
                     {m.scheduledFor && formatDateTime(m.scheduledFor)}
                   </TableCell>
                   {/* Fills the space left and ends in "…" rather than widening the table. */}
-                  <TableCell className="w-full max-w-0 truncate">{m.body}</TableCell>
+                  <TableCell className="w-full max-w-0 truncate">
+                    <MessagePreview message={m} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -270,5 +288,20 @@ function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** A one-line message: an image icon when it has one, and its text (or "Image" alone). */
+function MessagePreview({ message }: { message: BroadcastMessage }) {
+  return (
+    <>
+      {message.mediaUrl && (
+        <ImageIcon
+          className="mr-1.5 inline h-4 w-4 align-[-3px] text-muted-foreground"
+          aria-label="Has an image"
+        />
+      )}
+      {message.body || <span className="text-muted-foreground">Image</span>}
+    </>
   );
 }

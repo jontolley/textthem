@@ -12,6 +12,7 @@ import { serializeMessage } from '../serializers.js';
 import { COLLECTIONS, type MessageDoc } from '../db/documents.js';
 import { deliveryStats } from '../services/deliveries.js';
 import { sendBroadcast } from '../services/broadcasts.js';
+import type { MediaStore } from '../services/media.js';
 import type { TwilioService } from '../services/twilio.js';
 import type { UserDirectory } from '../services/users.js';
 
@@ -19,7 +20,10 @@ import type { UserDirectory } from '../services/users.js';
 const MIN_LEAD_MS = 60 * 1000;
 const MAX_LEAD_MS = 365 * 24 * 60 * 60 * 1000;
 
-const bodySchema = z.string().trim().min(1).max(1600);
+/** May be empty: a broadcast needs text, an image, or both (checked once both are known). */
+const bodySchema = z.string().trim().max(1600);
+const mediaUrlSchema = z.string().url().max(500);
+const NEEDS_CONTENT = 'Write a message or attach an image';
 
 const sendAtSchema = z
   .string()
@@ -32,10 +36,13 @@ const sendAtSchema = z
     message: 'Schedule it within the next year',
   });
 
-const broadcastSchema = z.object({
-  body: bodySchema,
-  sendAt: sendAtSchema.optional(),
-});
+const broadcastSchema = z
+  .object({
+    body: bodySchema.default(''),
+    mediaUrl: mediaUrlSchema.optional(),
+    sendAt: sendAtSchema.optional(),
+  })
+  .refine((v) => v.body || v.mediaUrl, { message: NEEDS_CONTENT, path: ['body'] });
 
 const isoTime = z
   .string()
@@ -60,8 +67,12 @@ const listMessagesSchema = z.object({
 });
 
 const updateScheduledSchema = z
-  .object({ body: bodySchema.optional(), sendAt: sendAtSchema.optional() })
-  .refine((v) => v.body !== undefined || v.sendAt !== undefined, {
+  .object({
+    body: bodySchema.optional(),
+    mediaUrl: mediaUrlSchema.nullable().optional(),
+    sendAt: sendAtSchema.optional(),
+  })
+  .refine((v) => v.body !== undefined || v.mediaUrl !== undefined || v.sendAt !== undefined, {
     message: 'Nothing to update',
   });
 
@@ -76,6 +87,8 @@ export interface MessageRoutesDeps {
   statusCallbackUrl: string;
   /** Names each broadcast's sender. */
   users: UserDirectory;
+  /** Where images are kept; without one, broadcasts can't have them. */
+  media?: MediaStore;
 }
 
 export async function messageRoutes(
@@ -103,11 +116,26 @@ export async function messageRoutes(
     return { message };
   }
 
+  /** Only images this server stored: Twilio fetches the URL, so it mustn't point anywhere else. */
+  function checkMediaUrl(url: string | null | undefined): void {
+    if (!url) return;
+    if (!deps.media) throw badRequest("Images aren't set up on this server");
+    if (!deps.media.owns(url)) throw badRequest('Upload the image first');
+  }
+
   /** Applies `update` only while the broadcast is still scheduled. */
-  async function updateScheduled(id: ObjectId, update: Partial<MessageDoc>): Promise<MessageDoc> {
+  async function updateScheduled(
+    id: ObjectId,
+    update: Partial<MessageDoc>,
+    unset: (keyof MessageDoc)[] = [],
+    extraFilter: Filter<MessageDoc> = {},
+  ): Promise<MessageDoc> {
     const updated = await messages.findOneAndUpdate(
-      { _id: id, status: 'scheduled' },
-      { $set: update },
+      { _id: id, status: 'scheduled', ...extraFilter },
+      {
+        $set: update,
+        ...(unset.length ? { $unset: Object.fromEntries(unset.map((k) => [k, ''])) } : {}),
+      },
       { returnDocument: 'after' },
     );
     if (updated) {
@@ -124,7 +152,8 @@ export async function messageRoutes(
     '/api/groups/:id/broadcast',
     async (request, reply): Promise<BroadcastResponse> => {
       const groupId = parseObjectId(request.params.id);
-      const { body, sendAt } = broadcastSchema.parse(request.body);
+      const { body, mediaUrl, sendAt } = broadcastSchema.parse(request.body);
+      checkMediaUrl(mediaUrl);
 
       const group = await groups.findOne({ _id: groupId });
       if (!group) throw notFound('Group not found');
@@ -133,6 +162,7 @@ export async function messageRoutes(
         _id: new ObjectId(),
         groupId,
         body,
+        ...(mediaUrl ? { mediaUrl } : {}),
         sentByUserId: request.userId,
         recipientCount: 0,
         acceptedCount: 0,
@@ -161,12 +191,43 @@ export async function messageRoutes(
     '/api/messages/:id',
     async (request): Promise<BroadcastResponse> => {
       const id = parseObjectId(request.params.id);
-      const { body, sendAt } = updateScheduledSchema.parse(request.body);
-      const updated = await updateScheduled(id, {
-        ...(body !== undefined ? { body } : {}),
-        ...(sendAt !== undefined ? { scheduledFor: sendAt } : {}),
-      });
-      return respond(updated);
+      const { body, mediaUrl, sendAt } = updateScheduledSchema.parse(request.body);
+      checkMediaUrl(mediaUrl);
+      // An edit can't leave it with neither text nor an image. When it clears one and
+      // keeps the other, the kept one is checked in the same atomic update.
+      const clearsBody = body === '';
+      const clearsMedia = mediaUrl === null;
+      if (clearsBody && clearsMedia) {
+        throw badRequest(NEEDS_CONTENT);
+      }
+      const keepsContent: Filter<MessageDoc> =
+        clearsBody && mediaUrl === undefined
+          ? { mediaUrl: { $exists: true } }
+          : clearsMedia && body === undefined
+            ? { body: { $nin: [''] } }
+            : {};
+      try {
+        const updated = await updateScheduled(
+          id,
+          {
+            ...(body !== undefined ? { body } : {}),
+            ...(mediaUrl ? { mediaUrl } : {}),
+            ...(sendAt !== undefined ? { scheduledFor: sendAt } : {}),
+          },
+          clearsMedia ? ['mediaUrl'] : [],
+          keepsContent,
+        );
+        return respond(updated);
+      } catch (err) {
+        // Still scheduled, so it was the content check that didn't match.
+        if (
+          Object.keys(keepsContent).length &&
+          (await messages.countDocuments({ _id: id, status: 'scheduled' }))
+        ) {
+          throw badRequest(NEEDS_CONTENT);
+        }
+        throw err;
+      }
     },
   );
 

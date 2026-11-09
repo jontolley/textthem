@@ -4,6 +4,8 @@ import type { AppConfig } from '../config.js';
 export interface SendOptions {
   /** URL Twilio POSTs this message's delivery status updates to. */
   statusCallback?: string;
+  /** Public URL of an image to attach, which makes the text an MMS. Twilio downloads it. */
+  mediaUrl?: string;
 }
 
 /** A send Twilio's API accepted. Delivery is reported later via status callback. */
@@ -29,7 +31,7 @@ export interface SendResult {
 export interface TwilioService {
   /** Validates a Twilio webhook signature (inbound SMS and status callbacks). */
   validateSignature(signature: string | undefined, url: string, params: Record<string, unknown>): boolean;
-  /** Sends a single SMS. Returns the accepted message, or null if Twilio rejected it. */
+  /** Sends a single SMS (or MMS, with `options.mediaUrl`). Returns the accepted message, or null if Twilio rejected it. */
   sendSms(to: string, body: string, options?: SendOptions): Promise<SentMessage | null>;
   /** Sends the same body to many recipients, tolerating individual failures. */
   sendBulk(recipients: string[], body: string, options?: SendOptions): Promise<SendResult>;
@@ -55,6 +57,7 @@ export function createTwilioService(config: AppConfig): TwilioService {
         body,
         ...sender,
         ...(options.statusCallback ? { statusCallback: options.statusCallback } : {}),
+        ...(options.mediaUrl ? { mediaUrl: [options.mediaUrl] } : {}),
       });
       return { to, sid: msg.sid, status: msg.status };
     } catch {

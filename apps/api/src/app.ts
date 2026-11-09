@@ -13,9 +13,11 @@ import { STATUS_CALLBACK_PATH, twilioRoutes } from './routes/twilio.js';
 import { meRoutes } from './routes/me.js';
 import { versionRoutes } from './routes/version.js';
 import { eventRoutes, type EventRoutesOptions } from './routes/events.js';
+import { localMediaRoutes, mediaRoutes } from './routes/media.js';
 import { HttpError } from './errors.js';
 import { startScheduler, type Scheduler } from './services/broadcasts.js';
 import { createChangeNotifier, type ChangeNotifier } from './services/events.js';
+import type { MediaStore, LocalMediaStore } from './services/media.js';
 import type { TwilioService } from './services/twilio.js';
 import { clerkUserDirectory, type UserDirectory } from './services/users.js';
 import type { AppConfig } from './config.js';
@@ -34,6 +36,8 @@ export interface BuildAppOptions {
    * tests, which run the scheduler pass directly.
    */
   schedulerIntervalMs?: number;
+  /** Where broadcast images go (see services/media.ts). Without one, broadcasts are text only. */
+  media?: MediaStore;
   /** Override the live-update notifier (tests inject one without throttling). */
   events?: ChangeNotifier;
   /** Override the live-update stream's timings (tests shorten them). */
@@ -67,6 +71,18 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
         details: error.details,
       });
     }
+    // Fastify's own client errors (bad JSON, too large, unsupported type) keep their status.
+    const status = (error as { statusCode?: number }).statusCode;
+    if (status && status >= 400 && status < 500) {
+      const code = (error as { code?: string }).code;
+      const message =
+        code === 'FST_ERR_CTP_BODY_TOO_LARGE'
+          ? 'That file is too large'
+          : code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
+            ? "That file type isn't supported"
+            : (error as Error).message;
+      return reply.code(status).send({ error: 'bad_request', message });
+    }
     request.log.error(error);
     return reply.code(500).send({ error: 'internal_error', message: 'Internal server error' });
   });
@@ -96,6 +112,8 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
 
   // ─── Public routes (no Clerk) ───────────────────────────────────────
   app.get('/health', async () => ({ status: 'ok' }));
+  const localMedia = opts.media && 'read' in opts.media ? (opts.media as LocalMediaStore) : null;
+  if (localMedia) await app.register(localMediaRoutes, { store: localMedia });
   await app.register(twilioRoutes, {
     twilio: opts.twilio,
     orgName: config.ORG_NAME,
@@ -118,11 +136,13 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     await scope.register(messageRoutes, {
       twilio: opts.twilio,
       statusCallbackUrl,
+      media: opts.media,
       users: opts.users ?? (usingClerk ? clerkUserDirectory(app.log) : async () => new Map()),
     });
     await scope.register(inboundRoutes);
     await scope.register(versionRoutes, { commit: config.GIT_SHA, builtAt: config.BUILT_AT });
-    await scope.register(meRoutes);
+    await scope.register(meRoutes, { canAttachImages: Boolean(opts.media) });
+    await scope.register(mediaRoutes, { media: opts.media });
     await scope.register(eventRoutes, opts.eventStream ?? {});
   });
 

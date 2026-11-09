@@ -42,3 +42,26 @@ describe('loadConfig — organizer allowlist', () => {
     expect(() => loadConfig({ ...env, NODE_ENV: 'production' })).toThrow(/ORGANIZER_USER_IDS/);
   });
 });
+
+describe('loadConfig — R2 image storage', () => {
+  const env = { ...base, TWILIO_MESSAGING_SERVICE_SID: 'MG_test' } as NodeJS.ProcessEnv;
+  const r2 = {
+    R2_ACCOUNT_ID: 'acct',
+    R2_ACCESS_KEY_ID: 'key',
+    R2_SECRET_ACCESS_KEY: 'secret',
+    R2_BUCKET: 'textthem-media',
+    R2_PUBLIC_URL: 'https://media.textthem.app',
+  };
+
+  it('is off with none of the settings', () => {
+    expect(loadConfig(env).r2).toBeUndefined();
+  });
+
+  it('is on with all of them', () => {
+    expect(loadConfig({ ...env, ...r2 }).r2).toEqual(r2);
+  });
+
+  it('throws when only some are set', () => {
+    expect(() => loadConfig({ ...env, R2_BUCKET: 'textthem-media' })).toThrow(/R2_ACCOUNT_ID/);
+  });
+});

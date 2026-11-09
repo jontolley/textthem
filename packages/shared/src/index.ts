@@ -94,7 +94,10 @@ export type BroadcastStatus =
 export interface BroadcastMessage {
   id: string;
   groupId: string;
+  /** May be empty when there's an image. */
   body: string;
+  /** Public URL of the attached image; present makes it an MMS. */
+  mediaUrl?: string;
   sentByUserId: string;
   /** The sender's name from Clerk; absent if the lookup failed. */
   sentByName?: string;
@@ -151,7 +154,10 @@ export interface MemberResponse {
 }
 
 export interface BroadcastRequest {
+  /** May be empty when there's an image. */
   body: string;
+  /** From `POST /api/media`. */
+  mediaUrl?: string;
   /** ISO-8601 time to send at. Omit to send now. */
   sendAt?: string;
 }
@@ -159,6 +165,8 @@ export interface BroadcastRequest {
 /** Edits a broadcast that is still scheduled. */
 export interface UpdateScheduledBroadcastRequest {
   body?: string;
+  /** A new image from `POST /api/media`, or null to remove it. */
+  mediaUrl?: string | null;
   sendAt?: string;
 }
 
@@ -255,6 +263,13 @@ export interface VersionResponse {
 /** The signed-in organizer, as the API sees them. */
 export interface MeResponse {
   userId: string;
+  /** False when the API has nowhere to store images, so broadcasts are text only. */
+  canAttachImages: boolean;
+}
+
+/** An uploaded broadcast image (`POST /api/media`, raw image bytes as the body). */
+export interface UploadMediaResponse {
+  mediaUrl: string;
 }
 
 /**

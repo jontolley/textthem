@@ -81,6 +81,18 @@ stubs (see `src/routes/groups.test.ts`).
 - **Outbound sender is either/or.** `src/services/twilio.ts` uses a Messaging
   Service when `TWILIO_MESSAGING_SERVICE_SID` is set, otherwise `TWILIO_FROM_NUMBER`.
   Config validation requires at least one.
+- **Images (MMS).** A broadcast can carry one image (`mediaUrl`), with or without
+  text. The dashboard resizes photos in the browser (`apps/web/src/lib/image.ts`,
+  JPEG at about 600 KB or less; GIFs go as is) and uploads them to `POST /api/media` as soon as
+  they're picked. The broadcast then sends with the returned URL.
+  - `src/services/media.ts` stores them in Cloudflare R2 (`R2_*` env, all or none) at
+    an unguessable key. Twilio downloads each image when it sends, so images are
+    never deleted (a scheduled one may go out days later).
+  - Without R2, local dev keeps images in `apps/api/.media` and serves them at `/media/…`.
+    Production then has no store: `GET /api/me` returns `canAttachImages: false`
+    and the dashboard hides "Add image".
+  - Broadcasts only accept URLs their own store handed out (`MediaStore.owns`).
+  - An MMS costs about three times an SMS. Inbound images (`NumMedia`/`MediaUrl0`) are still ignored.
 - **Scheduled broadcasts.** `src/services/broadcasts.ts` holds `sendBroadcast`,
   which both "send now" and the scheduler use. Recipients are the group's
   subscribers at send time. `server.ts` passes `schedulerIntervalMs` (30s) to
@@ -191,7 +203,7 @@ from. The two often differ, because the API only redeploys when `apps/api` or
   "Local build":
   `fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile --build-arg GIT_SHA=$(git rev-parse HEAD) --build-arg BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) .`
   Secrets (`MONGODB_URI`, Twilio, Clerk, `CORS_ORIGINS`, `PUBLIC_BASE_URL`,
-  `ORGANIZER_USER_IDS`) are set
+  `ORGANIZER_USER_IDS`, `R2_*`) are set
   via `fly secrets`; non-secret env (`MONGODB_DB_NAME`, `PORT`) is in `fly.toml`.
 - **Web → Cloudflare Pages**: build command `npm run build:web`, output
   `apps/web/dist`, root `/`.
