@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ImagePlus, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,11 @@ export function ImageAttachment({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const upload = useUploadMedia();
+  // The URL whose image has finished loading (or failed to). Until then it stays
+  // hidden behind "Attaching…", since it has no size yet and only the X would show.
+  const [shownUrl, setShownUrl] = useState<string>();
+  const showing = Boolean(value) && shownUrl === value;
+  const attaching = upload.isPending || (Boolean(value) && !showing);
 
   async function handlePick(file: File | undefined) {
     if (!file) return;
@@ -52,12 +57,16 @@ export function ImageAttachment({
         className="hidden"
         onChange={(e) => handlePick(e.target.files?.[0])}
       />
-      {value ? (
-        <div className="relative inline-block">
+      {value && (
+        // Rendered while hidden too, so the image loads.
+        <div className={showing ? 'relative inline-block' : 'hidden'}>
           <img
             src={value}
             alt="Attached image"
             className="max-h-40 max-w-full rounded-md border object-contain"
+            onLoad={() => setShownUrl(value)}
+            // Show it broken rather than spin forever; the X can still remove it.
+            onError={() => setShownUrl(value)}
           />
           <Button
             type="button"
@@ -70,23 +79,24 @@ export function ImageAttachment({
             <X className="h-4 w-4" />
           </Button>
         </div>
-      ) : (
+      )}
+      {!showing && (
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => input.current?.click()}
-          disabled={upload.isPending}
+          disabled={attaching}
         >
-          {upload.isPending ? (
+          {attaching ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <ImagePlus className="h-4 w-4" />
           )}
-          {upload.isPending ? 'Attaching…' : 'Add image'}
+          {attaching ? 'Attaching…' : 'Add image'}
         </Button>
       )}
-      {value && (
+      {showing && (
         <p className="text-xs text-muted-foreground">
           Sends as a picture message (MMS), which costs about three times a text.
         </p>
