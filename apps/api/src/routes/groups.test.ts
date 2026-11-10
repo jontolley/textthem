@@ -200,6 +200,57 @@ describe('groups API', () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it('sorts members by name (unnamed last), phone or date, either way', async () => {
+    const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
+    const groupId = created.json().group.id;
+    const text = (From: string, Body: string) =>
+      app.inject({ method: 'POST', url: '/api/twilio/inbound', payload: { From, Body } });
+    // Joined in this order; 0004 and 0002 stay unnamed.
+    const people = [
+      ['+15550000004', undefined],
+      ['+15550000003', 'carol'],
+      ['+15550000002', undefined],
+      ['+15550000001', 'Bob'],
+      ['+15550000005', 'Alice'],
+    ] as const;
+    for (const [phone] of people) {
+      await text(phone, 'DRAGON');
+      await new Promise((resolve) => setTimeout(resolve, 5)); // distinct join times
+    }
+    const list = async (query = '') =>
+      (await app.inject({ method: 'GET', url: `/api/groups/${groupId}/members?${query}` })).json();
+    const byPhone = new Map<string, string>(
+      (await list()).members.map((m: { phoneNumber: string; memberId: string }) => [
+        m.phoneNumber,
+        m.memberId,
+      ]),
+    );
+    for (const [phone, name] of people) {
+      if (name) {
+        await app.inject({
+          method: 'PATCH',
+          url: `/api/members/${byPhone.get(phone)}`,
+          payload: { name },
+        });
+      }
+    }
+    const phones = async (query = '') =>
+      (await list(query)).members.map((m: { phoneNumber: string }) => m.phoneNumber.slice(-1));
+
+    // Default: name A to Z ignoring case, unnamed after, ties by phone.
+    expect(await phones()).toEqual(['5', '1', '3', '2', '4']);
+    expect(await phones('sort=name&dir=desc')).toEqual(['3', '1', '5', '2', '4']);
+    expect(await phones('sort=phone')).toEqual(['1', '2', '3', '4', '5']);
+    expect(await phones('sort=phone&dir=desc')).toEqual(['5', '4', '3', '2', '1']);
+    // Dates default to most recent first.
+    expect(await phones('sort=subscribed')).toEqual(['5', '1', '2', '3', '4']);
+    expect(await phones('sort=subscribed&dir=asc')).toEqual(['4', '3', '2', '1', '5']);
+    // Paging and filtering follow the chosen sort.
+    expect(await phones('limit=2&offset=2')).toEqual(['3', '2']);
+    expect(await phones('sort=phone&dir=desc&q=555&limit=2')).toEqual(['5', '4']);
+    expect((await list('sort=bogus')).error).toBeDefined();
+  });
+
   it('lists who left the group apart from current members, most recent first', async () => {
     const created = await createGroup({ name: 'Dragons', keyword: 'DRAGON' });
     const groupId = created.json().group.id;
@@ -207,7 +258,10 @@ describe('groups API', () => {
       app.inject({ method: 'POST', url: '/api/twilio/inbound', payload: { From, Body } });
     const list = async (status: string) =>
       (
-        await app.inject({ method: 'GET', url: `/api/groups/${groupId}/members?status=${status}` })
+        await app.inject({
+          method: 'GET',
+          url: `/api/groups/${groupId}/members?status=${status}&sort=left`,
+        })
       ).json();
     const phones = (res: { members: { phoneNumber: string }[] }) =>
       res.members.map((m) => m.phoneNumber);

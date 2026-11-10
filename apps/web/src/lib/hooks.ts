@@ -13,6 +13,7 @@ import type {
   ChangeTopic,
   CreateGroupRequest,
   ListMessagesQuery,
+  MemberSortKey,
   SubscriptionStatus,
   UpdateGroupRequest,
   BroadcastRequest,
@@ -47,12 +48,18 @@ export function useGroup(id: string) {
  * A group's current members (`subscribed`) or the people who left it
  * (`unsubscribed`), fetched a page at a time and optionally filtered by `q`.
  */
-export function useGroupMembers(id: string, status: SubscriptionStatus, q: string) {
+export function useGroupMembers(
+  id: string,
+  status: SubscriptionStatus,
+  q: string,
+  sort: MemberSortKey,
+  dir: 'asc' | 'desc',
+) {
   const api = useApiClient();
   return useInfiniteQuery({
-    queryKey: ['groups', id, 'members', status, q],
+    queryKey: ['groups', id, 'members', status, q, sort, dir],
     queryFn: ({ pageParam }) =>
-      api.listGroupMembers(id, { status, q, offset: pageParam, limit: PAGE_SIZE }),
+      api.listGroupMembers(id, { status, q, sort, dir, offset: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, p) => n + p.members.length, 0);

@@ -177,9 +177,7 @@ export function GroupDetailPage() {
               </span>
               <Button
                 type="submit"
-                disabled={
-                  broadcast.isPending || uploading || (!scheduleLater && memberCount === 0)
-                }
+                disabled={broadcast.isPending || uploading || (!scheduleLater && memberCount === 0)}
               >
                 {scheduleLater ? (
                   <CalendarClock className="h-4 w-4" />
@@ -213,7 +211,7 @@ export function GroupDetailPage() {
             <span className="font-mono font-medium">{group.keyword}</span> for people to text in.
           </p>
         }
-        dateColumns={[{ label: 'Subscribed', value: (m) => m.subscribedAt }]}
+        dateColumns={[{ label: 'Subscribed', sort: 'subscribed', value: (m) => m.subscribedAt }]}
       />
 
       {/* Shown once someone has left. Collapsed by default: it's looked at now and then. */}
@@ -231,8 +229,8 @@ export function GroupDetailPage() {
           </p>
         }
         dateColumns={[
-          { label: 'Joined', value: (m) => m.subscribedAt },
-          { label: 'Left', value: (m) => m.unsubscribedAt },
+          { label: 'Joined', sort: 'subscribed', value: (m) => m.subscribedAt },
+          { label: 'Left', sort: 'left', value: (m) => m.unsubscribedAt },
         ]}
       />
     </div>

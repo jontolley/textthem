@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ListFilter } from 'lucide-react';
 import { toast } from 'sonner';
-import type { GroupMember, SubscriptionStatus } from '@text-them/shared';
+import type { GroupMember, MemberSortKey, SubscriptionStatus } from '@text-them/shared';
+import { SortableHead } from '@/components/BroadcastListControls';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import { Button } from '@/components/ui/button';
@@ -11,23 +13,61 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import { ApiError } from '@/lib/api';
 import { useGroupMembers, useUpdateMemberName } from '@/lib/hooks';
 import { formatPhoneNumber } from '@/lib/phone';
+import { cn } from '@/lib/utils';
 
 /** How long after the last keystroke a member's name saves. */
 const NAME_SAVE_DELAY_MS = 2000;
 /** How long after the last keystroke the filter applies. */
 const FILTER_DELAY_MS = 300;
 
+type Dir = 'asc' | 'desc';
+const SORT_KEYS: MemberSortKey[] = ['name', 'phone', 'subscribed', 'left'];
+// Names and numbers read A to Z; dates most recent first.
+const defaultDir = (key: MemberSortKey): Dir =>
+  key === 'name' || key === 'phone' ? 'asc' : 'desc';
+
+/**
+ * A member list's sort, kept in the page address under `<prefix>.sort` and
+ * `<prefix>.dir` like History's lists, so it survives a reload. The default
+ * (name, A to Z) is left out of the address.
+ */
+function useMemberSort(prefix: string) {
+  const [params, setParams] = useSearchParams();
+  const rawSort = params.get(`${prefix}.sort`) as MemberSortKey | null;
+  const sort: MemberSortKey = rawSort && SORT_KEYS.includes(rawSort) ? rawSort : 'name';
+  const rawDir = params.get(`${prefix}.dir`);
+  const dir: Dir = rawDir === 'asc' || rawDir === 'desc' ? rawDir : defaultDir(sort);
+
+  /** Sorts by `key`, or reverses it if it's already the sort. */
+  const sortBy = (key: MemberSortKey) => {
+    const nextDir = key === sort ? (dir === 'asc' ? 'desc' : 'asc') : defaultDir(key);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (key === 'name') next.delete(`${prefix}.sort`);
+        else next.set(`${prefix}.sort`, key);
+        if (nextDir === defaultDir(key)) next.delete(`${prefix}.dir`);
+        else next.set(`${prefix}.dir`, nextDir);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  return { sort, dir, sortBy };
+}
+
 /**
  * A collapsible card listing a group's members or the people who left. It
  * shows about ten rows and scrolls, fetching more as the bottom comes into
  * view. The filter button opens a box that matches names and phone numbers.
+ * Column headings sort the list (by name, A to Z, to start).
  */
 export function MemberListCard({
   id,
@@ -53,12 +93,17 @@ export function MemberListCard({
   intro?: React.ReactNode;
   /** Shown instead of the table when nobody is in the list. */
   empty?: React.ReactNode;
-  dateColumns: { label: string; value: (m: GroupMember) => string | undefined }[];
+  dateColumns: {
+    label: string;
+    sort: MemberSortKey;
+    value: (m: GroupMember) => string | undefined;
+  }[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [q, setQ] = useState('');
+  const { sort, dir, sortBy } = useMemberSort(status === 'subscribed' ? 'members' : 'left');
 
   useEffect(() => {
     const timer = setTimeout(() => setQ(filterText.trim()), FILTER_DELAY_MS);
@@ -69,6 +114,8 @@ export function MemberListCard({
     groupId,
     status,
     q,
+    sort,
+    dir,
   );
   const firstPage = data?.pages[0];
   const total = firstPage?.total ?? fallbackCount;
@@ -164,12 +211,29 @@ export function MemberListCard({
             <Table containerRef={scroller} containerStyle={{ maxHeight }}>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className={STICKY_HEAD}>Phone number</TableHead>
-                  <TableHead className={STICKY_HEAD}>Name</TableHead>
+                  <SortableHead
+                    label="Phone number"
+                    active={sort === 'phone'}
+                    dir={dir}
+                    onSort={() => sortBy('phone')}
+                    className={cn(STICKY_HEAD, 'whitespace-nowrap')}
+                  />
+                  <SortableHead
+                    label="Name"
+                    active={sort === 'name'}
+                    dir={dir}
+                    onSort={() => sortBy('name')}
+                    className={STICKY_HEAD}
+                  />
                   {dateColumns.map((c) => (
-                    <TableHead key={c.label} className={STICKY_HEAD}>
-                      {c.label}
-                    </TableHead>
+                    <SortableHead
+                      key={c.label}
+                      label={c.label}
+                      active={sort === c.sort}
+                      dir={dir}
+                      onSort={() => sortBy(c.sort)}
+                      className={STICKY_HEAD}
+                    />
                   ))}
                 </TableRow>
               </TableHeader>

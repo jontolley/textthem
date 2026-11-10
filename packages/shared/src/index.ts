@@ -191,9 +191,19 @@ export interface ListGroupMembersQuery {
   status?: SubscriptionStatus;
   /** Matches the name, or the phone number's digits (so formatting doesn't matter). */
   q?: string;
+  /**
+   * Order by name (the default), phone number, when they joined, or when they
+   * left. Members without a name come after named ones whichever way names
+   * sort. Ties fall back to the phone number.
+   */
+  sort?: MemberSortKey;
+  /** Defaults to A to Z for name and phone number, and most recent first for dates. */
+  dir?: 'asc' | 'desc';
   offset?: number;
   limit?: number;
 }
+
+export type MemberSortKey = 'name' | 'phone' | 'subscribed' | 'left';
 
 export interface ListGroupMembersResponse {
   /** This page. */

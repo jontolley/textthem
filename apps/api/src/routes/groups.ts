@@ -6,6 +6,7 @@ import type {
   ListGroupsResponse,
   ListGroupMembersResponse,
   GroupMember,
+  MemberSortKey,
 } from '@text-them/shared';
 import { badRequest, conflict, isDuplicateKeyError, notFound } from '../errors.js';
 import { escapeRegex } from '../regex.js';
@@ -37,9 +38,31 @@ const updateGroupSchema = createGroupSchema.partial();
 const listMembersSchema = z.object({
   status: z.enum(['subscribed', 'unsubscribed']).default('subscribed'),
   q: z.string().trim().max(100).default(''),
+  sort: z.enum(['name', 'phone', 'subscribed', 'left']).default('name'),
+  dir: z.enum(['asc', 'desc']).optional(),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(15),
 });
+
+/**
+ * The `$sort` for a member list. Names and phone numbers default to A to Z,
+ * dates to most recent first. Unnamed members always come after named ones,
+ * and ties fall back to the phone number (unique per member).
+ */
+function memberSort(sort: MemberSortKey, dirParam: 'asc' | 'desc' | undefined): Document {
+  const dir =
+    (dirParam ?? (sort === 'name' || sort === 'phone' ? 'asc' : 'desc')) === 'asc' ? 1 : -1;
+  switch (sort) {
+    case 'name':
+      return { noName: 1, nameKey: dir, 'member.phoneNumber': 1 };
+    case 'phone':
+      return { 'member.phoneNumber': dir };
+    case 'subscribed':
+      return { subscribedAt: dir, 'member.phoneNumber': 1 };
+    case 'left':
+      return { unsubscribedAt: dir, 'member.phoneNumber': 1 };
+  }
+}
 
 /**
  * Matches a member by name (case-insensitive) or by phone number. The number
@@ -168,7 +191,7 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     '/api/groups/:id/members',
     async (request): Promise<ListGroupMembersResponse> => {
       const id = parseObjectId(request.params.id);
-      const { status, q, offset, limit } = listMembersSchema.parse(request.query);
+      const { status, q, sort, dir, offset, limit } = listMembersSchema.parse(request.query);
       const group = await groups.findOne({ _id: id });
       if (!group) throw notFound('Group not found');
 
@@ -186,8 +209,18 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
           },
           { $unwind: '$member' },
           ...(q ? [{ $match: memberFilter(q) }] : []),
-          // Members in the order they joined; leavers most recent first.
-          { $sort: status === 'subscribed' ? { _id: 1 } : { unsubscribedAt: -1, _id: -1 } },
+          ...(sort === 'name'
+            ? [
+                {
+                  $addFields: {
+                    noName: { $cond: [{ $gt: [{ $ifNull: ['$member.name', ''] }, ''] }, 0, 1] },
+                    nameKey: { $toLower: { $ifNull: ['$member.name', ''] } },
+                  },
+                },
+              ]
+            : []),
+          { $sort: memberSort(sort, dir) },
+          { $project: { noName: 0, nameKey: 0 } },
           {
             $facet: {
               page: [{ $skip: offset }, { $limit: limit }],
