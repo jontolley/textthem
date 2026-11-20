@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, Image as ImageIcon, ListFilter, Pencil, X } from 'lucide-react';
+import { Check, ChevronRight, Copy, Image as ImageIcon, ListFilter, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BroadcastMessage } from '@text-them/shared';
 import { BroadcastFilterBar, SortableHead, useListView } from '@/components/BroadcastListControls';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { ImageAttachment } from '@/components/ImageAttachment';
+import { ImageAttachments } from '@/components/ImageAttachments';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -127,7 +127,7 @@ function EditScheduledDialog({
   const update = useUpdateScheduledBroadcast();
   const { data: me } = useMe();
   const [body, setBody] = useState(message.body);
-  const [mediaUrl, setMediaUrl] = useState(message.mediaUrl);
+  const [mediaUrls, setMediaUrls] = useState(message.mediaUrls ?? []);
   const [uploading, setUploading] = useState(false);
   const [sendAt, setSendAt] = useState(() =>
     toLocalInputValue(new Date(message.scheduledFor ?? Date.now())),
@@ -140,8 +140,8 @@ function EditScheduledDialog({
         id: message.id,
         body: {
           body: body.trim(),
-          // Only when it changed; null removes it.
-          ...(mediaUrl !== message.mediaUrl ? { mediaUrl: mediaUrl ?? null } : {}),
+          // Only when they changed; empty removes them all.
+          ...(mediaUrls.join() !== (message.mediaUrls ?? []).join() ? { mediaUrls } : {}),
           sendAt: new Date(sendAt).toISOString(),
         },
       });
@@ -171,14 +171,14 @@ function EditScheduledDialog({
                 onChange={(e) => setBody(e.target.value)}
                 maxLength={1600}
                 rows={4}
-                required={!mediaUrl}
+                required={!mediaUrls.length}
               />
             </div>
-            {/* An image it already has stays editable even if new uploads are off. */}
-            {(me?.canAttachImages || mediaUrl) && (
-              <ImageAttachment
-                value={mediaUrl}
-                onChange={setMediaUrl}
+            {/* Images it already has stay removable even if new uploads are off. */}
+            {(me?.canAttachImages || mediaUrls.length > 0) && (
+              <ImageAttachments
+                value={mediaUrls}
+                onChange={setMediaUrls}
                 onUploadingChange={setUploading}
               />
             )}
@@ -365,6 +365,7 @@ function BroadcastListCard({
                   // Scheduled ones show when they'll go; unsent ones (canceled, missed) when they were due.
                   const when = list === 'scheduled' ? m.scheduledFor : (m.sentAt ?? m.scheduledFor);
                   const rowOpen = expanded.has(m.id);
+                  const images = m.mediaUrls?.length ?? 0;
                   return (
                     // Click (or Enter/Space) shows the whole message; again folds it back.
                     <TableRow
@@ -374,8 +375,11 @@ function BroadcastListCard({
                       // Cells stay vertically centered when it opens, so a short message doesn't shift.
                       className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                       onClick={(e) => {
-                        // Links and buttons in the row (Twilio errors, Edit, Cancel) do their own thing.
-                        if (!(e.target as HTMLElement).closest('a, button')) toggle(m.id);
+                        // Links and buttons in the row (Twilio errors, Edit, Cancel, Copy) do their own thing.
+                        if ((e.target as HTMLElement).closest('a, button')) return;
+                        // Letting go after selecting text isn't a click to fold the row.
+                        if (window.getSelection()?.toString()) return;
+                        toggle(m.id);
                       }}
                       onKeyDown={(e) => {
                         if (e.target !== e.currentTarget) return;
@@ -398,29 +402,36 @@ function BroadcastListCard({
                       <TableCell>{groupName(m.groupId)}</TableCell>
                       <TableCell className="truncate">{m.sentByName ?? '—'}</TableCell>
                       <TableCell
-                        className={rowOpen ? 'whitespace-pre-wrap break-words' : 'truncate'}
+                        className={
+                          rowOpen ? 'cursor-text whitespace-pre-wrap break-words' : 'truncate'
+                        }
                       >
-                        {m.mediaUrl && !rowOpen && (
+                        {images > 0 && !rowOpen && (
                           <ImageIcon
                             className="mr-1.5 inline h-4 w-4 align-[-3px] text-muted-foreground"
-                            aria-label="Has an image"
+                            aria-label={images === 1 ? 'Has an image' : `Has ${images} images`}
                           />
                         )}
-                        {m.body || (!rowOpen && <span className="text-muted-foreground">Image</span>)}
-                        {m.mediaUrl && rowOpen && (
-                          <a
-                            href={m.mediaUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={cn('block w-fit', m.body && 'mt-2')}
-                          >
-                            <img
-                              src={m.mediaUrl}
-                              alt="Image sent with this broadcast"
-                              loading="lazy"
-                              className="max-h-48 max-w-full rounded-md border object-contain"
-                            />
-                          </a>
+                        {m.body ||
+                          (!rowOpen && (
+                            <span className="text-muted-foreground">
+                              {images === 1 ? 'Image' : `${images} images`}
+                            </span>
+                          ))}
+                        {m.body && rowOpen && <CopyButton text={m.body} />}
+                        {images > 0 && rowOpen && (
+                          <div className={cn('flex flex-wrap gap-2', m.body && 'mt-2')}>
+                            {m.mediaUrls!.map((url, i) => (
+                              <a key={url} href={url} target="_blank" rel="noreferrer">
+                                <img
+                                  src={url}
+                                  alt={`Image ${i + 1} sent with this broadcast`}
+                                  loading="lazy"
+                                  className="max-h-48 max-w-full rounded-md border object-contain"
+                                />
+                              </a>
+                            ))}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right">
@@ -462,7 +473,8 @@ function ScheduledCard({ groupName }: { groupName: (id: string) => string }) {
         id="scheduled-list"
         title="Scheduled"
         list="scheduled"
-        defaultOpen
+        // Folded by default: its count says what's waiting, and History stays the focus.
+        defaultOpen={false}
         whenLabel="Sends"
         lastLabel="Actions"
         groupName={groupName}
@@ -538,7 +550,7 @@ export function HistoryPage() {
         </Card>
       )}
 
-      {/* Rendered once both counts are in, since History starts folded when anything is scheduled. */}
+      {/* Rendered once both counts are in, so the cards don't flash in before the empty state. */}
       {loaded && (
         <>
           <ScheduledCard groupName={groupName} />
@@ -546,7 +558,7 @@ export function HistoryPage() {
             id="history-list"
             title="History"
             list="history"
-            defaultOpen={scheduledTotal === 0}
+            defaultOpen
             whenLabel="Sent"
             lastLabel="Delivery"
             groupName={groupName}
@@ -554,6 +566,36 @@ export function HistoryPage() {
           />
         </>
       )}
+    </div>
+  );
+}
+
+/** Copies an opened message's text, so it needn't be selected by hand. */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy the message");
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1.5 px-2 text-xs"
+        onClick={copy}
+      >
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? 'Copied' : 'Copy text'}
+      </Button>
     </div>
   );
 }

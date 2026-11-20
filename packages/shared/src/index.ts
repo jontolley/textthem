@@ -91,13 +91,16 @@ export type BroadcastStatus =
   | 'missed'
   | 'interrupted';
 
+/** Twilio's limit on images in one MMS. */
+export const MAX_BROADCAST_IMAGES = 10;
+
 export interface BroadcastMessage {
   id: string;
   groupId: string;
   /** May be empty when there's an image. */
   body: string;
-  /** Public URL of the attached image; present makes it an MMS. */
-  mediaUrl?: string;
+  /** Public URLs of the attached images, in order; any makes it an MMS. */
+  mediaUrls?: string[];
   sentByUserId: string;
   /** The sender's name from Clerk; absent if the lookup failed. */
   sentByName?: string;
@@ -156,8 +159,8 @@ export interface MemberResponse {
 export interface BroadcastRequest {
   /** May be empty when there's an image. */
   body: string;
-  /** From `POST /api/media`. */
-  mediaUrl?: string;
+  /** From `POST /api/media`, at most `MAX_BROADCAST_IMAGES`. */
+  mediaUrls?: string[];
   /** ISO-8601 time to send at. Omit to send now. */
   sendAt?: string;
 }
@@ -165,8 +168,8 @@ export interface BroadcastRequest {
 /** Edits a broadcast that is still scheduled. */
 export interface UpdateScheduledBroadcastRequest {
   body?: string;
-  /** A new image from `POST /api/media`, or null to remove it. */
-  mediaUrl?: string | null;
+  /** Replaces the images (from `POST /api/media`); empty removes them all. */
+  mediaUrls?: string[];
   sendAt?: string;
 }
 

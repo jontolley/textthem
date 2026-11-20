@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { ObjectId } from 'mongodb';
 import type { FastifyInstance } from 'fastify';
+import { MAX_BROADCAST_IMAGES } from '@text-them/shared';
 import { connectDatabase, type Database } from '../db/index.js';
 import { buildApp, type BuildAppOptions } from '../app.js';
 import { loadConfig } from '../config.js';
@@ -189,49 +190,87 @@ describe('image uploads', () => {
 });
 
 describe('broadcasts with images', () => {
-  it('sends the image with the text as an MMS', async () => {
+  it('sends the images with the text as one MMS, in order', async () => {
     const groupId = await seedGroup();
-    const mediaUrl = `${MEDIA_BASE}broadcasts/a.png`;
-    const res = await broadcast(groupId, { body: 'Look!', mediaUrl });
+    const mediaUrls = [`${MEDIA_BASE}broadcasts/a.png`, `${MEDIA_BASE}broadcasts/b.png`];
+    const res = await broadcast(groupId, { body: 'Look!', mediaUrls });
 
     expect(res.statusCode).toBe(201);
-    expect(res.json().message).toMatchObject({ body: 'Look!', mediaUrl, status: 'sent' });
-    expect(sendCalls[0].options?.mediaUrl).toBe(mediaUrl);
+    expect(res.json().message).toMatchObject({ body: 'Look!', mediaUrls, status: 'sent' });
+    expect(sendCalls).toHaveLength(1);
+    expect(sendCalls[0].options?.mediaUrls).toEqual(mediaUrls);
   });
 
   it('can send an image with no text', async () => {
     const groupId = await seedGroup();
-    const res = await broadcast(groupId, { body: '', mediaUrl: `${MEDIA_BASE}broadcasts/a.png` });
+    const res = await broadcast(groupId, {
+      body: '',
+      mediaUrls: [`${MEDIA_BASE}broadcasts/a.png`],
+    });
     expect(res.statusCode).toBe(201);
     expect(sendCalls[0].body).toBe('');
   });
 
   it('sends text-only broadcasts without media', async () => {
     const groupId = await seedGroup();
-    await broadcast(groupId, { body: 'Just words' });
-    expect(sendCalls[0].options?.mediaUrl).toBeUndefined();
+    const res = await broadcast(groupId, { body: 'Just words', mediaUrls: [] });
+    expect(res.json().message.mediaUrls).toBeUndefined();
+    expect(sendCalls[0].options?.mediaUrls).toBeUndefined();
   });
 
   it('needs text or an image', async () => {
     const groupId = await seedGroup();
-    const res = await broadcast(groupId, { body: '   ' });
+    const res = await broadcast(groupId, { body: '   ', mediaUrls: [] });
+    expect(res.statusCode).toBe(400);
+    expect(sendCalls).toHaveLength(0);
+  });
+
+  it(`takes at most ${MAX_BROADCAST_IMAGES} images`, async () => {
+    const groupId = await seedGroup();
+    const mediaUrls = Array.from(
+      { length: MAX_BROADCAST_IMAGES + 1 },
+      (_, i) => `${MEDIA_BASE}broadcasts/${i}.png`,
+    );
+    const res = await broadcast(groupId, { body: 'Hi', mediaUrls });
     expect(res.statusCode).toBe(400);
     expect(sendCalls).toHaveLength(0);
   });
 
   it("refuses an image URL this server didn't store", async () => {
     const groupId = await seedGroup();
-    const res = await broadcast(groupId, { body: 'Hi', mediaUrl: 'https://elsewhere.test/x.png' });
+    const res = await broadcast(groupId, {
+      body: 'Hi',
+      mediaUrls: [`${MEDIA_BASE}broadcasts/a.png`, 'https://elsewhere.test/x.png'],
+    });
     expect(res.statusCode).toBe(400);
     expect(sendCalls).toHaveLength(0);
   });
 
-  it('sends a scheduled broadcast with its image', async () => {
+  it('sends a scheduled broadcast with its images', async () => {
     const groupId = await seedGroup();
-    const mediaUrl = `${MEDIA_BASE}broadcasts/later.png`;
-    await broadcast(groupId, { body: 'Later', mediaUrl, sendAt: inMinutes(5) });
+    const mediaUrls = [`${MEDIA_BASE}broadcasts/later.png`, `${MEDIA_BASE}broadcasts/too.png`];
+    await broadcast(groupId, { body: 'Later', mediaUrls, sendAt: inMinutes(5) });
 
-    await runDueBroadcasts(
+    await runDue();
+    expect(sendCalls).toHaveLength(1);
+    expect(sendCalls[0].options?.mediaUrls).toEqual(mediaUrls);
+  });
+
+  it('still sends and shows an older broadcast saved with a single image', async () => {
+    const groupId = await seedGroup();
+    const mediaUrl = `${MEDIA_BASE}broadcasts/old.png`;
+    const res = await broadcast(groupId, { body: 'Old', sendAt: inMinutes(5) });
+    const _id = new ObjectId(res.json().message.id as string);
+    await database.collections.messages.updateOne({ _id }, { $set: { mediaUrl } });
+
+    await runDue();
+    expect(sendCalls[0].options?.mediaUrls).toEqual([mediaUrl]);
+    const list = await app.inject({ method: 'GET', url: '/api/messages' });
+    expect(list.json().messages[0].mediaUrls).toEqual([mediaUrl]);
+  });
+
+  function runDue() {
+    return runDueBroadcasts(
       {
         collections: database.collections,
         twilio: fakeTwilio,
@@ -239,12 +278,10 @@ describe('broadcasts with images', () => {
       },
       new Date(Date.now() + 6 * MINUTE),
     );
-    expect(sendCalls).toHaveLength(1);
-    expect(sendCalls[0].options?.mediaUrl).toBe(mediaUrl);
-  });
+  }
 });
 
-describe('editing a scheduled broadcast’s image', () => {
+describe('editing a scheduled broadcast’s images', () => {
   async function scheduled(payload: Record<string, unknown>): Promise<string> {
     const groupId = await seedGroup();
     const res = await broadcast(groupId, { ...payload, sendAt: inMinutes(30) });
@@ -252,33 +289,57 @@ describe('editing a scheduled broadcast’s image', () => {
     return res.json().message.id;
   }
 
-  it('adds, replaces and removes the image', async () => {
-    const id = await scheduled({ body: 'Hello' });
-    const first = `${MEDIA_BASE}broadcasts/1.png`;
-    const second = `${MEDIA_BASE}broadcasts/2.png`;
+  const one = `${MEDIA_BASE}broadcasts/1.png`;
+  const two = `${MEDIA_BASE}broadcasts/2.png`;
 
-    expect((await edit(id, { mediaUrl: first })).json().message.mediaUrl).toBe(first);
-    expect((await edit(id, { mediaUrl: second })).json().message.mediaUrl).toBe(second);
-    const removed = await edit(id, { mediaUrl: null });
+  it('adds, replaces and removes the images', async () => {
+    const id = await scheduled({ body: 'Hello' });
+
+    expect((await edit(id, { mediaUrls: [one] })).json().message.mediaUrls).toEqual([one]);
+    expect((await edit(id, { mediaUrls: [two, one] })).json().message.mediaUrls).toEqual([
+      two,
+      one,
+    ]);
+    const removed = await edit(id, { mediaUrls: [] });
     expect(removed.statusCode).toBe(200);
-    expect(removed.json().message.mediaUrl).toBeUndefined();
+    expect(removed.json().message.mediaUrls).toBeUndefined();
     const doc = await database.collections.messages.findOne({ _id: new ObjectId(id) });
+    expect(doc && 'mediaUrls' in doc).toBe(false);
+  });
+
+  it("replaces an older broadcast's single image", async () => {
+    const id = await scheduled({ body: 'Hello' });
+    const _id = new ObjectId(id);
+    await database.collections.messages.updateOne({ _id }, { $set: { mediaUrl: one } });
+
+    const res = await edit(id, { mediaUrls: [two] });
+    expect(res.json().message.mediaUrls).toEqual([two]);
+    const doc = await database.collections.messages.findOne({ _id });
     expect(doc && 'mediaUrl' in doc).toBe(false);
   });
 
   it('can clear the text when there is an image', async () => {
-    const id = await scheduled({ body: 'Hello', mediaUrl: `${MEDIA_BASE}broadcasts/1.png` });
+    const id = await scheduled({ body: 'Hello', mediaUrls: [one] });
     const res = await edit(id, { body: '' });
     expect(res.statusCode).toBe(200);
     expect(res.json().message.body).toBe('');
   });
 
-  it("won't remove the image when there's no text", async () => {
-    const id = await scheduled({ body: '', mediaUrl: `${MEDIA_BASE}broadcasts/1.png` });
-    const res = await edit(id, { mediaUrl: null });
+  it('can clear the text of an older broadcast with a single image', async () => {
+    const id = await scheduled({ body: 'Hello' });
+    await database.collections.messages.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { mediaUrl: one } },
+    );
+    expect((await edit(id, { body: '' })).statusCode).toBe(200);
+  });
+
+  it("won't remove the images when there's no text", async () => {
+    const id = await scheduled({ body: '', mediaUrls: [one, two] });
+    const res = await edit(id, { mediaUrls: [] });
     expect(res.statusCode).toBe(400);
     const doc = await database.collections.messages.findOne({ _id: new ObjectId(id) });
-    expect(doc?.mediaUrl).toBeDefined();
+    expect(doc?.mediaUrls).toEqual([one, two]);
   });
 
   it("won't clear the text when there's no image", async () => {
@@ -287,17 +348,17 @@ describe('editing a scheduled broadcast’s image', () => {
   });
 
   it("won't clear both at once", async () => {
-    const id = await scheduled({ body: 'Hello', mediaUrl: `${MEDIA_BASE}broadcasts/1.png` });
-    expect((await edit(id, { body: '', mediaUrl: null })).statusCode).toBe(400);
+    const id = await scheduled({ body: 'Hello', mediaUrls: [one] });
+    expect((await edit(id, { body: '', mediaUrls: [] })).statusCode).toBe(400);
   });
 
   it("still says it's no longer scheduled once it has gone out", async () => {
-    const id = await scheduled({ body: 'Hello', mediaUrl: `${MEDIA_BASE}broadcasts/1.png` });
+    const id = await scheduled({ body: 'Hello', mediaUrls: [one] });
     await database.collections.messages.updateOne(
       { _id: new ObjectId(id) },
       { $set: { status: 'sent' } },
     );
-    expect((await edit(id, { mediaUrl: null })).statusCode).toBe(409);
+    expect((await edit(id, { mediaUrls: [] })).statusCode).toBe(409);
   });
 });
 

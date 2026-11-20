@@ -4,8 +4,9 @@ import { ArrowLeft, CalendarClock, Image as ImageIcon, Send, Trash2 } from 'luci
 import { toast } from 'sonner';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { ImageAttachment } from '@/components/ImageAttachment';
+import { ImageAttachments } from '@/components/ImageAttachments';
 import { MemberListCard } from '@/components/MemberList';
+import { TextPreview } from '@/components/TextPreview';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,7 +37,7 @@ export function GroupDetailPage() {
   const deleteGroup = useDeleteGroup();
   const { data: me } = useMe();
   const [body, setBody] = useState('');
-  const [mediaUrl, setMediaUrl] = useState<string>();
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [scheduleLater, setScheduleLater] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -48,7 +49,7 @@ export function GroupDetailPage() {
     try {
       const res = await broadcast.mutateAsync({
         body: body.trim(),
-        mediaUrl,
+        mediaUrls,
         // A datetime-local value without an offset parses as the browser's local time.
         sendAt: scheduleLater ? new Date(sendAt).toISOString() : undefined,
       });
@@ -59,7 +60,7 @@ export function GroupDetailPage() {
           : `Queued ${message.acceptedCount} of ${message.recipientCount} texts. Delivery status shows in History.`,
       );
       setBody('');
-      setMediaUrl(undefined);
+      setMediaUrls([]);
       setScheduleLater(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Failed to send broadcast');
@@ -126,73 +127,84 @@ export function GroupDetailPage() {
           <CardTitle>Send a broadcast</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleBroadcast} className="space-y-3">
-            <Textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              maxLength={MAX_LENGTH}
-              placeholder={`Message to all ${memberCount} subscribed members…`}
-              rows={4}
-              // An image can go on its own.
-              required={!mediaUrl}
-            />
-            {me?.canAttachImages && (
-              <ImageAttachment
-                value={mediaUrl}
-                onChange={setMediaUrl}
-                onUploadingChange={setUploading}
+          {/* The preview sits beside the form on wide screens and under it on phones. */}
+          <form
+            onSubmit={handleBroadcast}
+            className="grid items-start gap-6 md:grid-cols-[minmax(0,1fr)_22rem] lg:grid-cols-[minmax(0,1fr)_26rem]"
+          >
+            <div className="space-y-3">
+              <Textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                maxLength={MAX_LENGTH}
+                placeholder={`Message to all ${memberCount} subscribed members…`}
+                rows={4}
+                // Grows with the message (where supported) so long ones are readable whole.
+                className="max-h-96 min-h-28 [field-sizing:content]"
+                // An image can go on its own.
+                required={!mediaUrls.length}
               />
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={scheduleLater}
-                  onChange={(e) => setScheduleLater(e.target.checked)}
-                  className="h-4 w-4 accent-primary"
-                />
-                Schedule for later
-              </label>
-              {scheduleLater && (
-                <Input
-                  type="datetime-local"
-                  aria-label="Send at"
-                  value={sendAt}
-                  min={toLocalInputValue(new Date())}
-                  onChange={(e) => setSendAt(e.target.value)}
-                  className="w-auto"
-                  required
+              {me?.canAttachImages && (
+                <ImageAttachments
+                  value={mediaUrls}
+                  onChange={setMediaUrls}
+                  onUploadingChange={setUploading}
                 />
               )}
-            </div>
-            {scheduleLater && (
-              <p className="text-xs text-muted-foreground">
-                It goes to whoever is subscribed at that time, in your time zone. You can edit or
-                cancel it from History until then.
-              </p>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {body.length}/{MAX_LENGTH}
-              </span>
-              <Button
-                type="submit"
-                disabled={broadcast.isPending || uploading || (!scheduleLater && memberCount === 0)}
-              >
-                {scheduleLater ? (
-                  <CalendarClock className="h-4 w-4" />
-                ) : (
-                  <Send className="h-4 w-4" />
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={scheduleLater}
+                    onChange={(e) => setScheduleLater(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  Schedule for later
+                </label>
+                {scheduleLater && (
+                  <Input
+                    type="datetime-local"
+                    aria-label="Send at"
+                    value={sendAt}
+                    min={toLocalInputValue(new Date())}
+                    onChange={(e) => setSendAt(e.target.value)}
+                    className="w-auto"
+                    required
+                  />
                 )}
-                {scheduleLater
-                  ? broadcast.isPending
-                    ? 'Scheduling…'
-                    : 'Schedule'
-                  : broadcast.isPending
-                    ? 'Sending…'
-                    : `Send to ${memberCount}`}
-              </Button>
+              </div>
+              {scheduleLater && (
+                <p className="text-xs text-muted-foreground">
+                  It goes to whoever is subscribed at that time, in your time zone. You can edit or
+                  cancel it from History until then.
+                </p>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {body.length}/{MAX_LENGTH}
+                </span>
+                <Button
+                  type="submit"
+                  disabled={
+                    broadcast.isPending || uploading || (!scheduleLater && memberCount === 0)
+                  }
+                >
+                  {scheduleLater ? (
+                    <CalendarClock className="h-4 w-4" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {scheduleLater
+                    ? broadcast.isPending
+                      ? 'Scheduling…'
+                      : 'Schedule'
+                    : broadcast.isPending
+                      ? 'Sending…'
+                      : `Send to ${memberCount}`}
+                </Button>
+              </div>
             </div>
+            <TextPreview body={body} mediaUrls={mediaUrls} />
           </form>
           {scheduled.length > 0 && <ScheduledList messages={scheduled} />}
         </CardContent>
@@ -203,7 +215,7 @@ export function GroupDetailPage() {
         title="Members"
         groupId={id}
         status="subscribed"
-        defaultOpen
+        defaultOpen={false}
         fallbackCount={memberCount}
         empty={
           <p className="text-sm text-muted-foreground">
@@ -289,17 +301,20 @@ function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
   );
 }
 
-/** A one-line message: an image icon when it has one, and its text (or "Image" alone). */
+/** A one-line message: an image icon when it has images, and its text (or "Image" alone). */
 function MessagePreview({ message }: { message: BroadcastMessage }) {
+  const images = message.mediaUrls?.length ?? 0;
   return (
     <>
-      {message.mediaUrl && (
+      {images > 0 && (
         <ImageIcon
           className="mr-1.5 inline h-4 w-4 align-[-3px] text-muted-foreground"
-          aria-label="Has an image"
+          aria-label={images === 1 ? 'Has an image' : `Has ${images} images`}
         />
       )}
-      {message.body || <span className="text-muted-foreground">Image</span>}
+      {message.body || (
+        <span className="text-muted-foreground">{images === 1 ? 'Image' : `${images} images`}</span>
+      )}
     </>
   );
 }

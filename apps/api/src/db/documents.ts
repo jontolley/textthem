@@ -46,7 +46,9 @@ export interface MessageDoc {
   groupId: ObjectId;
   /** May be empty when there's an image. */
   body: string;
-  /** Public URL of the attached image (an MMS); see services/media.ts. */
+  /** Public URLs of the attached images, in order (an MMS); see services/media.ts. */
+  mediaUrls?: string[];
+  /** Broadcasts from before several images were allowed have this instead; read via `mediaUrlsOf`. */
   mediaUrl?: string;
   sentByUserId: string;
   /** Absent on broadcasts from before scheduling existed, which were all sent. */
@@ -103,3 +105,8 @@ export const COLLECTIONS = {
   deliveries: 'deliveries',
   inboundMessages: 'inbound_messages',
 } as const;
+
+/** A broadcast's images, whether it was saved with one image or several. */
+export function mediaUrlsOf(doc: Pick<MessageDoc, 'mediaUrls' | 'mediaUrl'>): string[] {
+  return doc.mediaUrls ?? (doc.mediaUrl ? [doc.mediaUrl] : []);
+}

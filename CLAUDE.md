@@ -81,10 +81,11 @@ stubs (see `src/routes/groups.test.ts`).
 - **Outbound sender is either/or.** `src/services/twilio.ts` uses a Messaging
   Service when `TWILIO_MESSAGING_SERVICE_SID` is set, otherwise `TWILIO_FROM_NUMBER`.
   Config validation requires at least one.
-- **Images (MMS).** A broadcast can carry one image (`mediaUrl`), with or without
-  text. The dashboard resizes photos in the browser (`apps/web/src/lib/image.ts`,
-  JPEG at about 600 KB or less; GIFs go as is) and uploads them to `POST /api/media` as soon as
-  they're picked. The broadcast then sends with the returned URL.
+- **Images (MMS).** A broadcast can carry up to 10 images (`mediaUrls`, Twilio's
+  limit), with or without text, sent together as one MMS. The dashboard resizes photos in the browser (`apps/web/src/lib/image.ts`,
+  JPEG at about 600 KB or less; GIFs go as is), refuses a set over 5 MB in total, and uploads them to `POST /api/media` as soon as
+  they're picked. The broadcast then sends with the returned URLs.
+  - Broadcasts saved before this have a single `mediaUrl` instead; read both through `mediaUrlsOf` (`src/db/documents.ts`).
   - `src/services/media.ts` stores them in Cloudflare R2 (`R2_*` env, all or none) at
     an unguessable key. Twilio downloads each image when it sends, so images are
     never deleted (a scheduled one may go out days later).

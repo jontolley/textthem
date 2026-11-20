@@ -6,8 +6,8 @@
 
 /** What carriers deliver reliably. */
 const TARGET_BYTES = 600 * 1024;
-/** Twilio's (and the API's) limit. */
-const MAX_BYTES = 5 * 1024 * 1024;
+/** Twilio's (and the API's) limit, for one image and for all of one message's together. */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** Longest side after scaling; phones show MMS images far smaller than this. */
 const MAX_SIDE = 1600;
 
@@ -16,7 +16,8 @@ export class ImageError extends Error {}
 export async function prepareImage(file: File): Promise<Blob> {
   // Re-encoding a GIF would drop its animation, so it goes as is.
   if (file.type === 'image/gif') {
-    if (file.size > MAX_BYTES) throw new ImageError('That GIF is over 5 MB. Try a smaller one.');
+    if (file.size > MAX_IMAGE_BYTES)
+      throw new ImageError('That GIF is over 5 MB. Try a smaller one.');
     return file;
   }
 

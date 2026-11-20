@@ -1,10 +1,11 @@
 import { ObjectId, type Document, type Filter } from 'mongodb';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import type {
-  BroadcastResponse,
-  ListMessagesResponse,
-  ListSendersResponse,
+import {
+  MAX_BROADCAST_IMAGES,
+  type BroadcastResponse,
+  type ListMessagesResponse,
+  type ListSendersResponse,
 } from '@text-them/shared';
 import { badRequest, conflict, notFound } from '../errors.js';
 import { escapeRegex } from '../regex.js';
@@ -22,7 +23,9 @@ const MAX_LEAD_MS = 365 * 24 * 60 * 60 * 1000;
 
 /** May be empty: a broadcast needs text, an image, or both (checked once both are known). */
 const bodySchema = z.string().trim().max(1600);
-const mediaUrlSchema = z.string().url().max(500);
+const mediaUrlsSchema = z
+  .array(z.string().url().max(500))
+  .max(MAX_BROADCAST_IMAGES, `Attach at most ${MAX_BROADCAST_IMAGES} images`);
 const NEEDS_CONTENT = 'Write a message or attach an image';
 
 const sendAtSchema = z
@@ -39,10 +42,10 @@ const sendAtSchema = z
 const broadcastSchema = z
   .object({
     body: bodySchema.default(''),
-    mediaUrl: mediaUrlSchema.optional(),
+    mediaUrls: mediaUrlsSchema.default([]),
     sendAt: sendAtSchema.optional(),
   })
-  .refine((v) => v.body || v.mediaUrl, { message: NEEDS_CONTENT, path: ['body'] });
+  .refine((v) => v.body || v.mediaUrls.length, { message: NEEDS_CONTENT, path: ['body'] });
 
 const isoTime = z
   .string()
@@ -69,10 +72,11 @@ const listMessagesSchema = z.object({
 const updateScheduledSchema = z
   .object({
     body: bodySchema.optional(),
-    mediaUrl: mediaUrlSchema.nullable().optional(),
+    /** Replaces the images; empty removes them all. */
+    mediaUrls: mediaUrlsSchema.optional(),
     sendAt: sendAtSchema.optional(),
   })
-  .refine((v) => v.body !== undefined || v.mediaUrl !== undefined || v.sendAt !== undefined, {
+  .refine((v) => v.body !== undefined || v.mediaUrls !== undefined || v.sendAt !== undefined, {
     message: 'Nothing to update',
   });
 
@@ -117,10 +121,10 @@ export async function messageRoutes(
   }
 
   /** Only images this server stored: Twilio fetches the URL, so it mustn't point anywhere else. */
-  function checkMediaUrl(url: string | null | undefined): void {
-    if (!url) return;
+  function checkMediaUrls(urls: string[] = []): void {
+    if (!urls.length) return;
     if (!deps.media) throw badRequest("Images aren't set up on this server");
-    if (!deps.media.owns(url)) throw badRequest('Upload the image first');
+    if (!urls.every((url) => deps.media!.owns(url))) throw badRequest('Upload the images first');
   }
 
   /** Applies `update` only while the broadcast is still scheduled. */
@@ -152,8 +156,8 @@ export async function messageRoutes(
     '/api/groups/:id/broadcast',
     async (request, reply): Promise<BroadcastResponse> => {
       const groupId = parseObjectId(request.params.id);
-      const { body, mediaUrl, sendAt } = broadcastSchema.parse(request.body);
-      checkMediaUrl(mediaUrl);
+      const { body, mediaUrls, sendAt } = broadcastSchema.parse(request.body);
+      checkMediaUrls(mediaUrls);
 
       const group = await groups.findOne({ _id: groupId });
       if (!group) throw notFound('Group not found');
@@ -162,7 +166,7 @@ export async function messageRoutes(
         _id: new ObjectId(),
         groupId,
         body,
-        ...(mediaUrl ? { mediaUrl } : {}),
+        ...(mediaUrls.length ? { mediaUrls } : {}),
         sentByUserId: request.userId,
         recipientCount: 0,
         acceptedCount: 0,
@@ -191,18 +195,19 @@ export async function messageRoutes(
     '/api/messages/:id',
     async (request): Promise<BroadcastResponse> => {
       const id = parseObjectId(request.params.id);
-      const { body, mediaUrl, sendAt } = updateScheduledSchema.parse(request.body);
-      checkMediaUrl(mediaUrl);
+      const { body, mediaUrls, sendAt } = updateScheduledSchema.parse(request.body);
+      checkMediaUrls(mediaUrls);
       // An edit can't leave it with neither text nor an image. When it clears one and
       // keeps the other, the kept one is checked in the same atomic update.
       const clearsBody = body === '';
-      const clearsMedia = mediaUrl === null;
+      const clearsMedia = mediaUrls?.length === 0;
       if (clearsBody && clearsMedia) {
         throw badRequest(NEEDS_CONTENT);
       }
       const keepsContent: Filter<MessageDoc> =
-        clearsBody && mediaUrl === undefined
-          ? { mediaUrl: { $exists: true } }
+        clearsBody && mediaUrls === undefined
+          ? // Older broadcasts keep a single image in `mediaUrl`.
+            { $or: [{ 'mediaUrls.0': { $exists: true } }, { mediaUrl: { $exists: true } }] }
           : clearsMedia && body === undefined
             ? { body: { $nin: [''] } }
             : {};
@@ -211,10 +216,11 @@ export async function messageRoutes(
           id,
           {
             ...(body !== undefined ? { body } : {}),
-            ...(mediaUrl ? { mediaUrl } : {}),
+            ...(mediaUrls?.length ? { mediaUrls } : {}),
             ...(sendAt !== undefined ? { scheduledFor: sendAt } : {}),
           },
-          clearsMedia ? ['mediaUrl'] : [],
+          // New images replace an older broadcast's single one too.
+          mediaUrls === undefined ? [] : clearsMedia ? ['mediaUrls', 'mediaUrl'] : ['mediaUrl'],
           keepsContent,
         );
         return respond(updated);

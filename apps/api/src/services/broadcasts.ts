@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { Collections } from '../db/index.js';
-import type { MessageDoc } from '../db/documents.js';
+import { mediaUrlsOf, type MessageDoc } from '../db/documents.js';
 import { recordSends } from './deliveries.js';
 import type { TwilioService } from './twilio.js';
 
@@ -30,11 +30,12 @@ export async function sendBroadcast(deps: BroadcastDeps, broadcast: MessageDoc):
   const memberDocs = await members.find({ _id: { $in: subs.map((s) => s.memberId) } }).toArray();
   const recipients = memberDocs.map((m) => m.phoneNumber);
 
+  const mediaUrls = mediaUrlsOf(broadcast);
   const { accepted, failed } =
     recipients.length > 0
       ? await deps.twilio.sendBulk(recipients, broadcast.body, {
           statusCallback: deps.statusCallbackUrl,
-          ...(broadcast.mediaUrl ? { mediaUrl: broadcast.mediaUrl } : {}),
+          ...(mediaUrls.length ? { mediaUrls } : {}),
         })
       : { accepted: [], failed: 0 };
   await recordSends(deliveries, broadcast._id, accepted);

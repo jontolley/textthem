@@ -5,7 +5,13 @@ import type {
   InboundMessage,
   Member,
 } from '@text-them/shared';
-import type { GroupDoc, InboundMessageDoc, MemberDoc, MessageDoc } from './db/documents.js';
+import {
+  mediaUrlsOf,
+  type GroupDoc,
+  type InboundMessageDoc,
+  type MemberDoc,
+  type MessageDoc,
+} from './db/documents.js';
 
 export function serializeGroup(doc: GroupDoc, memberCount?: number): Group {
   return {
@@ -34,11 +40,12 @@ export function serializeMessage(
   delivery?: DeliveryStats,
   sentByName?: string,
 ): BroadcastMessage {
+  const mediaUrls = mediaUrlsOf(doc);
   return {
     id: doc._id.toHexString(),
     groupId: doc.groupId.toHexString(),
     body: doc.body,
-    mediaUrl: doc.mediaUrl,
+    mediaUrls: mediaUrls.length ? mediaUrls : undefined,
     sentByUserId: doc.sentByUserId,
     sentByName,
     status: doc.status ?? 'sent',
