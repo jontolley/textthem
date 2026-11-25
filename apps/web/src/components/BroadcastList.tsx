@@ -6,6 +6,14 @@ import { BroadcastFilterBar, SortableHead, useListView } from '@/components/Broa
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ImageAttachments } from '@/components/ImageAttachments';
+import {
+  LOADING_CARD,
+  LoadingBar,
+  LoadingLabel,
+  Skeleton,
+  SkeletonTableRows,
+  reloadingClass,
+} from '@/components/Loading';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -278,10 +286,8 @@ export function BroadcastListCard({
   const open = fill || openState;
   const listView = useListView(list, list === 'scheduled' ? 'asc' : 'desc');
   const [filterOpen, setFilterOpen] = useState(listView.filtering);
-  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useMessageList(
-    list,
-    listView.view,
-  );
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage, isPlaceholderData } =
+    useMessageList(list, listView.view);
   const messages = useRows(data?.pages);
   const firstPage = data?.pages[0];
   const total = firstPage?.total ?? 0;
@@ -304,10 +310,46 @@ export function BroadcastListCard({
       return next;
     });
 
+  // First load: a folded list waits unseen (it may turn out empty); an open one
+  // shows its title over placeholder rows.
+  if (!firstPage) {
+    if (!open) return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {title}
+            <Skeleton className="h-5 w-8" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <LoadingLabel />
+          <Table className="table-fixed">
+            <TableBody>
+              <SkeletonTableRows
+                columns={5}
+                rows={fill ? 8 : 5}
+                cellClassNames={[
+                  COLUMNS.when,
+                  COLUMNS.group,
+                  COLUMNS.sentBy,
+                  COLUMNS.message,
+                  COLUMNS.last,
+                ]}
+              />
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (total === 0) return null;
 
   return (
-    <Card>
+    <Card className={LOADING_CARD}>
+      {/* A new sort or filter is loading; the old rows stay up, dimmed. */}
+      <LoadingBar active={open && isPlaceholderData} />
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
@@ -370,7 +412,11 @@ export function BroadcastListCard({
             <p className="text-sm text-muted-foreground">No messages match these filters.</p>
           )}
           {messages.length > 0 && (
-            <Table className="table-fixed" containerRef={scroller} containerStyle={{ maxHeight }}>
+            <Table
+              className={cn('table-fixed', reloadingClass(isPlaceholderData))}
+              containerRef={scroller}
+              containerStyle={{ maxHeight }}
+            >
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <SortableHead

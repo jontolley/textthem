@@ -3,9 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { LoadingLabel, Skeleton, SkeletonTableRows } from '@/components/Loading';
 import { MemberListCard } from '@/components/MemberList';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Table, TableBody } from '@/components/ui/table';
 import { useDeleteGroup, useGroup } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 
@@ -26,7 +29,7 @@ export function GroupDetailPage() {
     }
   }
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (isLoading) return <GroupDetailSkeleton />;
   if (!group) return <p className="text-sm text-destructive">Group not found.</p>;
 
   const memberCount = group.memberCount ?? 0;
@@ -114,6 +117,32 @@ export function GroupDetailPage() {
           { label: 'Left', sort: 'left', value: (m) => m.unsubscribedAt },
         ]}
       />
+    </div>
+  );
+}
+
+/** The page's shape while the group loads: its heading, then the Members card. */
+function GroupDetailSkeleton() {
+  return (
+    <div className="space-y-6">
+      <LoadingLabel />
+      <Skeleton className="h-4 w-28" />
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-32" />
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableBody>
+              <SkeletonTableRows columns={3} />
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

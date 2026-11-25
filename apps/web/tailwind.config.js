@@ -44,6 +44,16 @@ export default {
           foreground: 'hsl(var(--card-foreground))',
         },
       },
+      keyframes: {
+        // Slides a bar 2/5 of the track wide from off the left edge to off the right.
+        'loading-bar': {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(250%)' },
+        },
+      },
+      animation: {
+        'loading-bar': 'loading-bar 1.1s ease-in-out infinite',
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',

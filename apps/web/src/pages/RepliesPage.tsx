@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Group, InboundMessage } from '@text-them/shared';
+import { LoadingLabel, Skeleton } from '@/components/Loading';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatDateTime } from '@/lib/datetime';
@@ -90,7 +91,24 @@ export function RepliesPage() {
         <ViewToggle view={view} onChange={setView} />
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {isLoading && (
+        <Card>
+          <CardContent className="py-2">
+            <LoadingLabel />
+            <ul className="divide-y">
+              {['w-3/4', 'w-1/2', 'w-2/3', 'w-3/5'].map((width, i) => (
+                <li key={i} className="space-y-2 py-4">
+                  <div className="flex justify-between gap-4">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <Skeleton className={`h-4 ${width}`} />
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {shown && shown.length === 0 && (
         <Card>

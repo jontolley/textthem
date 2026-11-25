@@ -4,7 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useMessageList } from '@/lib/hooks';
 
 export function HistoryPage() {
-  // The card fetches its own list; this (shared through the query cache) decides the page's state.
+  // The card fetches its own list (and shows its own loading state); this one,
+  // shared through the query cache, decides whether there's anything to show.
   const past = useMessageList('history');
   const groupName = useGroupName();
   const pastTotal = past.data?.pages[0]?.total;
@@ -21,8 +22,6 @@ export function HistoryPage() {
           page until they go.
         </p>
       </div>
-
-      {past.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
 
       {pastTotal === 0 && (
         <Card>

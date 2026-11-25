@@ -5,17 +5,18 @@ import { toast } from 'sonner';
 import type { GroupMember, MemberSortKey, SubscriptionStatus } from '@text-them/shared';
 import { SortableHead } from '@/components/BroadcastListControls';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
+import {
+  LOADING_CARD,
+  LoadingBar,
+  LoadingLabel,
+  SkeletonTableRows,
+  reloadingClass,
+} from '@/components/Loading';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { ApiError } from '@/lib/api';
 import { useGroupMembers, useUpdateMemberName } from '@/lib/hooks';
 import { formatPhoneNumber } from '@/lib/phone';
@@ -110,13 +111,8 @@ export function MemberListCard({
     return () => clearTimeout(timer);
   }, [filterText]);
 
-  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useGroupMembers(
-    groupId,
-    status,
-    q,
-    sort,
-    dir,
-  );
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage, isPlaceholderData } =
+    useGroupMembers(groupId, status, q, sort, dir);
   const firstPage = data?.pages[0];
   const total = firstPage?.total ?? fallbackCount;
   const matched = firstPage?.matched ?? 0;
@@ -147,7 +143,9 @@ export function MemberListCard({
   const columnCount = 2 + dateColumns.length;
 
   return (
-    <Card>
+    <Card className={LOADING_CARD}>
+      {/* A new sort or filter is loading; the old rows stay up, dimmed. */}
+      <LoadingBar active={open && isPlaceholderData} />
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
@@ -204,11 +202,26 @@ export function MemberListCard({
             </div>
           )}
           {total === 0 && empty}
+          {/* First load: placeholder rows, as many as there will be (up to five). */}
+          {!data && total > 0 && (
+            <>
+              <LoadingLabel />
+              <Table>
+                <TableBody>
+                  <SkeletonTableRows columns={columnCount} rows={Math.min(total, 5)} />
+                </TableBody>
+              </Table>
+            </>
+          )}
           {total > 0 && q && firstPage && matched === 0 && (
             <p className="text-sm text-muted-foreground">No one matches &ldquo;{q}&rdquo;.</p>
           )}
           {total > 0 && rows.length > 0 && (
-            <Table containerRef={scroller} containerStyle={{ maxHeight }}>
+            <Table
+              className={reloadingClass(isPlaceholderData)}
+              containerRef={scroller}
+              containerStyle={{ maxHeight }}
+            >
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <SortableHead

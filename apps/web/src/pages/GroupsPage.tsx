@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { LoadingLabel, Skeleton } from '@/components/Loading';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +37,22 @@ export function GroupsPage() {
         </Button>
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {isLoading && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <LoadingLabel />
+          {[0, 1, 2].map((i) => (
+            <Card key={i}>
+              <CardHeader className="space-y-3">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-4 w-1/2" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-1/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
       {isError && <p className="text-sm text-destructive">Failed to load groups.</p>}
 
       {groups && groups.length === 0 && (
