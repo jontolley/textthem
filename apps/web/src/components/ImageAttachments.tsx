@@ -38,7 +38,7 @@ export function ImageAttachments({
     if (input.current) input.current.value = ''; // Lets the same files be picked again.
     if (!files.length) return;
     if (files.length > room) {
-      toast.error(`A broadcast can have up to ${MAX_BROADCAST_IMAGES} images.`);
+      toast.error(`A message can have up to ${MAX_BROADCAST_IMAGES} images.`);
       return;
     }
 

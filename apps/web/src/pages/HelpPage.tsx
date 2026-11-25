@@ -118,10 +118,8 @@ export function HelpPage() {
           </ul>
         ))}
         <p>
-          New groups also need an entry in the org config (<span className="font-mono">
-            apps/web/src/config/org.ts
-          </span>
-          ) to get a Join page.
+          New groups also need an entry in the org config (
+          <span className="font-mono">apps/web/src/config/org.ts</span>) to get a Join page.
         </p>
       </Section>
 
@@ -161,11 +159,41 @@ export function HelpPage() {
         </ul>
       </Section>
 
-      <Section title="Scheduled broadcasts">
+      <Section title="Sending a message">
         <ul>
-          <li>Times are in your time zone. It sends within about 30 seconds of the time you set.</li>
+          <li>
+            Go to <strong>Message</strong>, choose a group, write the text, and press{' '}
+            <strong>Send</strong>. It goes to everyone currently subscribed to that group.
+          </li>
+          <li>
+            From a group&apos;s page, <strong>Send a message</strong> opens Message with that group
+            already chosen.
+          </li>
+          <li>
+            The preview beside the form (under it on a phone) shows how the text will look on a
+            phone.
+          </li>
+          <li>
+            <strong>Add images</strong> attaches up to 10 photos, sent together as one picture
+            message. Picture messages cost about three times as much as a text.
+          </li>
+          <li>
+            Tick <strong>Schedule for later</strong> to pick a send time instead. Scheduled messages
+            wait in the Scheduled list on the Message page.
+          </li>
+          <li>
+            Once sent, a message shows in <strong>History</strong> with its delivery results.
+          </li>
+        </ul>
+      </Section>
+
+      <Section title="Scheduled messages">
+        <ul>
+          <li>
+            Times are in your time zone. It sends within about 30 seconds of the time you set.
+          </li>
           <li>It goes to whoever is subscribed at send time, not when you scheduled it.</li>
-          <li>You can edit or cancel it in History until it sends.</li>
+          <li>You can edit or cancel it on the Message page until it sends.</li>
           <li>
             <strong>Missed</strong>: the server was down for over an hour past the send time, so it
             wasn&apos;t sent late. Send it again if it still matters.

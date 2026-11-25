@@ -123,7 +123,7 @@ export function SortableHead({
  * A dropdown drawn with our own arrow, set in from the right edge; the
  * browser's own arrow sits too close to the border.
  */
-function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <span className="relative inline-flex">
       <select

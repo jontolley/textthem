@@ -105,16 +105,6 @@ export function useSenders() {
   });
 }
 
-/** One group's scheduled broadcasts, soonest first (up to 100). */
-export function useGroupScheduled(groupId: string) {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: ['messages', 'scheduled', groupId],
-    queryFn: () =>
-      api.listMessages({ list: 'scheduled', groupId, limit: 100 }).then((r) => r.messages),
-  });
-}
-
 /** Texts people sent to the org's number, most recent first. */
 export function useInboundMessages() {
   const api = useApiClient();
@@ -222,11 +212,12 @@ export function useUpdateMemberName() {
 }
 
 /** Sends now, or schedules when `sendAt` (ISO) is given. */
-export function useBroadcast(groupId: string) {
+export function useBroadcast() {
   const api = useApiClient();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: BroadcastRequest) => api.broadcast(groupId, body),
+    mutationFn: ({ groupId, body }: { groupId: string; body: BroadcastRequest }) =>
+      api.broadcast(groupId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
   });
 }

@@ -7,6 +7,7 @@ import { GroupDetailPage } from './pages/GroupDetailPage';
 import { HelpPage } from './pages/HelpPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { LandingPage } from './pages/LandingPage';
+import { MessagePage } from './pages/MessagePage';
 import { RepliesPage } from './pages/RepliesPage';
 import { publicRoutes } from './routes/public';
 
@@ -31,6 +32,7 @@ function DashboardApp() {
             <Route element={<Layout />}>
               <Route index element={<GroupsPage />} />
               <Route path="groups/:id" element={<GroupDetailPage />} />
+              <Route path="message" element={<MessagePage />} />
               <Route path="history" element={<HistoryPage />} />
               <Route path="replies" element={<RepliesPage />} />
               <Route path="help" element={<HelpPage />} />

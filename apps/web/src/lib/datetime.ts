@@ -23,3 +23,13 @@ export function formatDateTime(iso: string): string {
     timeZoneName: 'short',
   });
 }
+
+/** A compact date and time for narrow screens, e.g. "Nov 25, 10:00 AM". */
+export function formatShortDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}

@@ -115,7 +115,7 @@ export function PlatformPrivacyPage() {
           consent and opt-outs.
         </li>
         <li>
-          Broadcast history is kept so organizers can see what was sent, and is deleted on request.
+          Message history is kept so organizers can see what was sent, and is deleted on request.
         </li>
       </ul>
 

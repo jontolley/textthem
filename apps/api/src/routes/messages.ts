@@ -147,9 +147,9 @@ export async function messageRoutes(
       return updated;
     }
     if (await messages.countDocuments({ _id: id })) {
-      throw conflict("This broadcast is no longer scheduled, so it can't be changed");
+      throw conflict("This message is no longer scheduled, so it can't be changed");
     }
-    throw notFound('Broadcast not found');
+    throw notFound('Message not found');
   }
 
   fastify.post<{ Params: { id: string } }>(

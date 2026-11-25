@@ -1,71 +1,20 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, Image as ImageIcon, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { ImageAttachments } from '@/components/ImageAttachments';
 import { MemberListCard } from '@/components/MemberList';
-import { TextPreview } from '@/components/TextPreview';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import type { BroadcastMessage } from '@text-them/shared';
-import { useBroadcast, useDeleteGroup, useGroup, useGroupScheduled, useMe } from '@/lib/hooks';
+import { useDeleteGroup, useGroup } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
-import { defaultSendTime, formatDateTime, toLocalInputValue } from '@/lib/datetime';
-
-const MAX_LENGTH = 1600;
 
 export function GroupDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { data: group, isLoading } = useGroup(id);
-  // The API lists scheduled broadcasts soonest first.
-  const { data: scheduled = [] } = useGroupScheduled(id);
-  const broadcast = useBroadcast(id);
   const deleteGroup = useDeleteGroup();
-  const { data: me } = useMe();
-  const [body, setBody] = useState('');
-  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [scheduleLater, setScheduleLater] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // Local wall-clock time from the datetime-local input, e.g. "2026-10-25T09:00".
-  const [sendAt, setSendAt] = useState(() => toLocalInputValue(defaultSendTime()));
-
-  async function handleBroadcast(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const res = await broadcast.mutateAsync({
-        body: body.trim(),
-        mediaUrls,
-        // A datetime-local value without an offset parses as the browser's local time.
-        sendAt: scheduleLater ? new Date(sendAt).toISOString() : undefined,
-      });
-      const { message } = res;
-      toast.success(
-        message.status === 'scheduled' && message.scheduledFor
-          ? `Scheduled for ${formatDateTime(message.scheduledFor)}. You can edit or cancel it in History.`
-          : `Queued ${message.acceptedCount} of ${message.recipientCount} texts. Delivery status shows in History.`,
-      );
-      setBody('');
-      setMediaUrls([]);
-      setScheduleLater(false);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Failed to send broadcast');
-    }
-  }
 
   async function handleDelete() {
     try {
@@ -102,14 +51,21 @@ export function GroupDetailPage() {
             subscribed
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setConfirmingDelete(true)}
-          disabled={deleteGroup.isPending}
-        >
-          <Trash2 className="h-4 w-4" /> Delete
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button asChild size="sm">
+            <Link to={`/message?group=${id}`}>
+              <Send className="h-4 w-4" /> Send a message
+            </Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmingDelete(true)}
+            disabled={deleteGroup.isPending}
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+        </div>
       </div>
 
       <ConfirmDialog
@@ -122,100 +78,13 @@ export function GroupDetailPage() {
         onConfirm={handleDelete}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Send a broadcast</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* The preview sits beside the form on wide screens and under it on phones. */}
-          <form
-            onSubmit={handleBroadcast}
-            className="grid items-start gap-6 md:grid-cols-[minmax(0,1fr)_22rem] lg:grid-cols-[minmax(0,1fr)_26rem]"
-          >
-            <div className="space-y-3">
-              <Textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                maxLength={MAX_LENGTH}
-                placeholder={`Message to all ${memberCount} subscribed members…`}
-                rows={4}
-                // Grows with the message (where supported) so long ones are readable whole.
-                className="max-h-96 min-h-28 [field-sizing:content]"
-                // An image can go on its own.
-                required={!mediaUrls.length}
-              />
-              {me?.canAttachImages && (
-                <ImageAttachments
-                  value={mediaUrls}
-                  onChange={setMediaUrls}
-                  onUploadingChange={setUploading}
-                />
-              )}
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={scheduleLater}
-                    onChange={(e) => setScheduleLater(e.target.checked)}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  Schedule for later
-                </label>
-                {scheduleLater && (
-                  <Input
-                    type="datetime-local"
-                    aria-label="Send at"
-                    value={sendAt}
-                    min={toLocalInputValue(new Date())}
-                    onChange={(e) => setSendAt(e.target.value)}
-                    className="w-auto"
-                    required
-                  />
-                )}
-              </div>
-              {scheduleLater && (
-                <p className="text-xs text-muted-foreground">
-                  It goes to whoever is subscribed at that time, in your time zone. You can edit or
-                  cancel it from History until then.
-                </p>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  {body.length}/{MAX_LENGTH}
-                </span>
-                <Button
-                  type="submit"
-                  disabled={
-                    broadcast.isPending || uploading || (!scheduleLater && memberCount === 0)
-                  }
-                >
-                  {scheduleLater ? (
-                    <CalendarClock className="h-4 w-4" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  {scheduleLater
-                    ? broadcast.isPending
-                      ? 'Scheduling…'
-                      : 'Schedule'
-                    : broadcast.isPending
-                      ? 'Sending…'
-                      : `Send to ${memberCount}`}
-                </Button>
-              </div>
-            </div>
-            <TextPreview body={body} mediaUrls={mediaUrls} />
-          </form>
-          {scheduled.length > 0 && <ScheduledList messages={scheduled} />}
-        </CardContent>
-      </Card>
-
       <MemberListCard
         id="member-list"
         title="Members"
         groupId={id}
         status="subscribed"
-        defaultOpen={false}
+        // Open: with the send form gone, the members are what this page is for.
+        defaultOpen
         fallbackCount={memberCount}
         empty={
           <p className="text-sm text-muted-foreground">
@@ -246,75 +115,5 @@ export function GroupDetailPage() {
         ]}
       />
     </div>
-  );
-}
-
-/** This group's broadcasts waiting to go out, under the send form. */
-function ScheduledList({ messages }: { messages: BroadcastMessage[] }) {
-  // Folded by default: the count says what's waiting, and the send form stays the focus.
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="mt-6 space-y-3 border-t pt-4">
-      <h3 className="text-sm font-semibold">
-        <CollapsibleToggle
-          id="scheduled-list"
-          title="Scheduled"
-          count={messages.length}
-          open={open}
-          onToggle={() => setOpen((v) => !v)}
-        />
-      </h3>
-      {open && (
-        <div id="scheduled-list" className="space-y-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Sends</TableHead>
-                <TableHead>Message</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {messages.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell className="whitespace-nowrap font-medium">
-                    {m.scheduledFor && formatDateTime(m.scheduledFor)}
-                  </TableCell>
-                  {/* Fills the space left and ends in "…" rather than widening the table. */}
-                  <TableCell className="w-full max-w-0 truncate">
-                    <MessagePreview message={m} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <p className="text-xs text-muted-foreground">
-            Edit or cancel them in{' '}
-            <Link to="/history" className="text-link underline-offset-4 hover:underline">
-              History
-            </Link>
-            .
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** A one-line message: an image icon when it has images, and its text (or "Image" alone). */
-function MessagePreview({ message }: { message: BroadcastMessage }) {
-  const images = message.mediaUrls?.length ?? 0;
-  return (
-    <>
-      {images > 0 && (
-        <ImageIcon
-          className="mr-1.5 inline h-4 w-4 align-[-3px] text-muted-foreground"
-          aria-label={images === 1 ? 'Has an image' : `Has ${images} images`}
-        />
-      )}
-      {message.body || (
-        <span className="text-muted-foreground">{images === 1 ? 'Image' : `${images} images`}</span>
-      )}
-    </>
   );
 }

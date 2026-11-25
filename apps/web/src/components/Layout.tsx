@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 // Links sit on the green header bar; the active one is underlined in white.
 function navClass({ isActive }: { isActive: boolean }) {
   return cn(
-    'border-b-2 py-[18px] text-sm font-medium transition-colors',
+    'border-b-2 py-[18px] text-[13px] font-medium transition-colors sm:text-sm',
     isActive ? 'border-white text-white' : 'border-transparent text-white/90 hover:text-white',
   );
 }
@@ -21,16 +21,19 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-muted/20">
       <header className="bg-primary text-primary-foreground">
-        <div className="container flex h-14 items-center justify-between gap-4">
+        <div className="container flex h-14 items-center justify-between gap-3 px-4 sm:gap-4 sm:px-8">
           <div className="flex items-center gap-4 sm:gap-6">
-            <Link to="/" className="flex items-center gap-2 font-semibold">
+            <Link to="/" className="hidden items-center gap-2 font-semibold sm:flex">
               <AppIcon />
-              {/* Phones only have room for the icon beside four nav links. */}
-              <span className="sr-only sm:not-sr-only">Text Them</span>
+              <span>Text Them</span>
             </Link>
-            <nav className="flex items-center gap-4">
+            {/* Phones only have room for the five links, so the logo (Groups also goes home) is hidden there. */}
+            <nav className="flex items-center gap-3 sm:gap-4">
               <NavLink to="/" end className={navClass}>
                 Groups
+              </NavLink>
+              <NavLink to="/message" className={navClass}>
+                Message
               </NavLink>
               <NavLink to="/history" className={navClass}>
                 History
@@ -57,7 +60,7 @@ export function Layout() {
           </UserButton>
         </div>
       </header>
-      <main className="container py-8">
+      <main className="container px-4 py-8 sm:px-8">
         <Outlet />
       </main>
     </div>
