@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody } from '@/components/ui/table';
-import { useDeleteGroup, useGroup } from '@/lib/hooks';
+import { useDeleteGroup, useGroup, useSetMembersPaused } from '@/lib/hooks';
 import { ApiError } from '@/lib/api';
 
 export function GroupDetailPage() {
@@ -24,6 +24,7 @@ export function GroupDetailPage() {
   const navigate = useNavigate();
   const { data: group, isLoading } = useGroup(id);
   const deleteGroup = useDeleteGroup();
+  const setPaused = useSetMembersPaused();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [selection, setSelection] = useState<MemberSelection>(NO_SELECTION);
   const [transferMode, setTransferMode] = useState<TransferMode | null>(null);
@@ -41,11 +42,51 @@ export function GroupDetailPage() {
     }
   }
 
+  /**
+   * Pauses or resumes the checked members. A pause can be undone from its
+   * message, which resumes exactly the members it paused.
+   */
+  async function handlePaused(action: 'pause' | 'resume') {
+    try {
+      const { memberIds } = await setPaused.mutateAsync({
+        id,
+        action,
+        body: selection.all ? { all: true } : { memberIds: [...selection.ids] },
+      });
+      setSelection(NO_SELECTION);
+      const n = memberIds.length;
+      const who = `${n} ${n === 1 ? 'member' : 'members'}`;
+      if (n === 0) {
+        toast.info(
+          action === 'pause' ? 'They were all paused already.' : 'None of them were paused.',
+        );
+      } else if (action === 'pause') {
+        toast.success(`Paused ${who}. They won't get this group's messages.`, {
+          // Longer than usual, so there's time to reach Undo.
+          duration: 10_000,
+          action: {
+            label: 'Undo',
+            onClick: () =>
+              setPaused.mutate(
+                { id, action: 'resume', body: { memberIds } },
+                { onError: () => toast.error('Failed to undo the pause') },
+              ),
+          },
+        });
+      } else {
+        toast.success(`Resumed ${who}.`);
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : `Failed to ${action} members`);
+    }
+  }
+
   if (isLoading) return <GroupDetailSkeleton />;
   if (!group) return <p className="text-sm text-destructive">Group not found.</p>;
 
   const memberCount = group.memberCount ?? 0;
-  const selectedCount = selection.all ? memberCount : selection.ids.size;
+  const pausedCount = group.pausedCount ?? 0;
+  const selectedCount = selection.all ? memberCount + pausedCount : selection.ids.size;
 
   return (
     <div className="space-y-6">
@@ -64,7 +105,7 @@ export function GroupDetailPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             Keyword <span className="font-mono font-medium">{group.keyword}</span> · {memberCount}{' '}
-            subscribed
+            subscribed{pausedCount > 0 && ` · ${pausedCount} paused`}
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -98,10 +139,10 @@ export function GroupDetailPage() {
         id="member-list"
         title="Members"
         groupId={id}
-        status="subscribed"
+        list="members"
         // Open: with the send form gone, the members are what this page is for.
         defaultOpen
-        fallbackCount={memberCount}
+        fallbackCount={memberCount + pausedCount}
         empty={
           <p className="text-sm text-muted-foreground">
             No subscribers yet. Share the keyword{' '}
@@ -115,6 +156,9 @@ export function GroupDetailPage() {
           selectedCount > 0 && (
             <SelectionBar
               count={selectedCount}
+              onPause={() => handlePaused('pause')}
+              onResume={() => handlePaused('resume')}
+              busy={setPaused.isPending}
               onCopy={() => setTransferMode('copy')}
               onMove={() => setTransferMode('move')}
               onClear={() => setSelection(NO_SELECTION)}
@@ -137,14 +181,13 @@ export function GroupDetailPage() {
         id="left-group-list"
         title="Left the group"
         groupId={id}
-        status="unsubscribed"
+        list="left"
         defaultOpen={false}
         hideWhenEmpty
         intro={
           <p className="text-sm text-muted-foreground">
-            People who texted STOP, or who were moved to another group. STOP takes them out of
-            every group and they get no more texts. To rejoin, they text START and then the
-            group&rsquo;s keyword.
+            People who texted STOP. STOP takes them out of every group and they get no more texts.
+            To rejoin, they text START and then the group&rsquo;s keyword.
           </p>
         }
         dateColumns={[

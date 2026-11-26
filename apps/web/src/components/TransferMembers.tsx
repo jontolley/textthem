@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Copy, MoveRight, X } from 'lucide-react';
+import { Copy, MoveRight, Pause, Play, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Group, TransferMembersResponse } from '@text-them/shared';
 import { Select } from '@/components/BroadcastListControls';
@@ -30,20 +30,33 @@ function plural(n: number, one: string, many = `${one}s`): string {
 /** Shown in the member list's header while members are checked. */
 export function SelectionBar({
   count,
+  onPause,
+  onResume,
   onCopy,
   onMove,
   onClear,
+  busy,
 }: {
   count: number;
+  onPause: () => void;
+  onResume: () => void;
   onCopy: () => void;
   onMove: () => void;
   onClear: () => void;
+  /** A pause or resume is running. */
+  busy: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2 text-sm font-normal">
       <span className="text-muted-foreground" aria-live="polite">
         {count} selected
       </span>
+      <Button size="sm" variant="outline" className="h-8" onClick={onPause} disabled={busy}>
+        <Pause className="h-4 w-4" /> Pause
+      </Button>
+      <Button size="sm" variant="outline" className="h-8" onClick={onResume} disabled={busy}>
+        <Play className="h-4 w-4" /> Resume
+      </Button>
       <Button size="sm" variant="outline" className="h-8" onClick={onCopy}>
         <Copy className="h-4 w-4" /> Copy to…
       </Button>
@@ -72,6 +85,7 @@ function summarize(mode: TransferMode, target: string, r: TransferMembersRespons
   if (r.skippedOptedOut) {
     parts.push(`${r.skippedOptedOut} skipped (they'd texted STOP to that group)`);
   }
+  if (r.skippedPaused) parts.push(`${r.skippedPaused} skipped (paused there)`);
   if (mode === 'move' && r.removed !== r.added) {
     parts.push(`${plural(r.removed, 'member')} taken out of this group`);
   }
@@ -177,8 +191,9 @@ export function TransferMembersDialog({
             </div>
             <p className="text-sm text-muted-foreground">
               They didn&rsquo;t text this group&rsquo;s keyword themselves, so only add people
-              who&rsquo;ve agreed to hear from it. They aren&rsquo;t sent a text about it. Anyone
-              who texted STOP to that group is skipped.
+              who&rsquo;ve agreed to hear from it. They aren&rsquo;t sent a text about it. Paused
+              members aren&rsquo;t included, and anyone who texted STOP to that group or is paused
+              there is skipped.
             </p>
           </div>
         )}

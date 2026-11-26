@@ -143,7 +143,7 @@ describe('POST /api/groups/:id/members/transfer', () => {
 
     const res = await transfer(a, { targetGroupId: b, mode: 'copy', memberIds: [await memberId(ALICE)] });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ added: 1, alreadyInGroup: 0, skippedOptedOut: 0, removed: 0 });
+    expect(res.json()).toEqual({ added: 1, alreadyInGroup: 0, skippedOptedOut: 0, skippedPaused: 0, removed: 0 });
     expect(await subscribedPhones(a)).toEqual([ALICE, BOB]);
     expect(await subscribedPhones(b)).toEqual([ALICE]);
 
@@ -158,7 +158,7 @@ describe('POST /api/groups/:id/members/transfer', () => {
     await text(BOB, 'ALPHA');
 
     const res = await transfer(a, { targetGroupId: b, mode: 'move', all: true });
-    expect(res.json()).toEqual({ added: 2, alreadyInGroup: 0, skippedOptedOut: 0, removed: 2 });
+    expect(res.json()).toEqual({ added: 2, alreadyInGroup: 0, skippedOptedOut: 0, skippedPaused: 0, removed: 2 });
     expect(await subscribedPhones(a)).toEqual([]);
     expect(await subscribedPhones(b)).toEqual([ALICE, BOB]);
 
@@ -174,7 +174,7 @@ describe('POST /api/groups/:id/members/transfer', () => {
 
     await transfer(a, { targetGroupId: b, mode: 'move', all: true });
     const res = await transfer(b, { targetGroupId: a, mode: 'move', all: true });
-    expect(res.json()).toEqual({ added: 1, alreadyInGroup: 0, skippedOptedOut: 0, removed: 1 });
+    expect(res.json()).toEqual({ added: 1, alreadyInGroup: 0, skippedOptedOut: 0, skippedPaused: 0, removed: 1 });
     expect(await subscribedPhones(a)).toEqual([ALICE]);
     expect(await subscribedPhones(b)).toEqual([]);
   });
@@ -188,7 +188,7 @@ describe('POST /api/groups/:id/members/transfer', () => {
     await text(ALICE, 'ALPHA'); // rejoins only ALPHA
 
     const res = await transfer(a, { targetGroupId: b, mode: 'move', all: true });
-    expect(res.json()).toEqual({ added: 0, alreadyInGroup: 0, skippedOptedOut: 1, removed: 0 });
+    expect(res.json()).toEqual({ added: 0, alreadyInGroup: 0, skippedOptedOut: 1, skippedPaused: 0, removed: 0 });
     expect(await subscribedPhones(a)).toEqual([ALICE]);
     expect(await subscribedPhones(b)).toEqual([]);
   });
@@ -201,7 +201,7 @@ describe('POST /api/groups/:id/members/transfer', () => {
     await text(BOB, 'ALPHA');
 
     const res = await transfer(a, { targetGroupId: b, mode: 'move', all: true });
-    expect(res.json()).toEqual({ added: 1, alreadyInGroup: 1, skippedOptedOut: 0, removed: 2 });
+    expect(res.json()).toEqual({ added: 1, alreadyInGroup: 1, skippedOptedOut: 0, skippedPaused: 0, removed: 2 });
     expect(await subscribedPhones(b)).toEqual([ALICE, BOB]);
     expect(
       await database.collections.subscriptions.countDocuments({ groupId: new ObjectId(b) }),
@@ -219,7 +219,7 @@ describe('POST /api/groups/:id/members/transfer', () => {
       mode: 'copy',
       memberIds: [await memberId(ALICE), new ObjectId().toHexString()],
     });
-    expect(res.json()).toEqual({ added: 0, alreadyInGroup: 0, skippedOptedOut: 0, removed: 0 });
+    expect(res.json()).toEqual({ added: 0, alreadyInGroup: 0, skippedOptedOut: 0, skippedPaused: 0, removed: 0 });
     expect(await subscribedPhones(b)).toEqual([]);
     expect(await subscribedPhones(c)).toEqual([ALICE]);
   });

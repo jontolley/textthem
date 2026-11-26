@@ -128,6 +128,10 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     publicBaseUrl: config.PUBLIC_BASE_URL,
   });
 
+  // Organizers' names, for who sent a broadcast and who paused a member.
+  const users: UserDirectory =
+    opts.users ?? (usingClerk ? clerkUserDirectory(app.log) : async () => new Map());
+
   const statusCallbackUrl = new URL(STATUS_CALLBACK_PATH, config.PUBLIC_BASE_URL).toString();
 
   // ─── Protected routes (Clerk middleware scoped to this child) ────────
@@ -138,13 +142,13 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
         publishableKey: config.CLERK_PUBLISHABLE_KEY,
       });
     }
-    await scope.register(groupRoutes);
+    await scope.register(groupRoutes, { users });
     await scope.register(memberRoutes);
     await scope.register(messageRoutes, {
       twilio: opts.twilio,
       statusCallbackUrl,
       media: opts.media,
-      users: opts.users ?? (usingClerk ? clerkUserDirectory(app.log) : async () => new Map()),
+      users,
     });
     await scope.register(inboundRoutes);
     await scope.register(versionRoutes, { commit: config.GIT_SHA, builtAt: config.BUILT_AT });

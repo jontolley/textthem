@@ -13,7 +13,10 @@ import {
   type MessageDoc,
 } from './db/documents.js';
 
-export function serializeGroup(doc: GroupDoc, memberCount?: number): Group {
+export function serializeGroup(
+  doc: GroupDoc,
+  counts?: { subscribed: number; paused: number },
+): Group {
   return {
     id: doc._id.toHexString(),
     orgId: doc.orgId.toHexString(),
@@ -21,7 +24,8 @@ export function serializeGroup(doc: GroupDoc, memberCount?: number): Group {
     keyword: doc.keyword,
     description: doc.description,
     active: doc.active,
-    memberCount,
+    memberCount: counts?.subscribed,
+    pausedCount: counts?.paused,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };

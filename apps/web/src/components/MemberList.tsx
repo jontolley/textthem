@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ListFilter } from 'lucide-react';
 import { toast } from 'sonner';
-import type { GroupMember, MemberSortKey, SubscriptionStatus } from '@text-them/shared';
+import type { GroupMember, MemberListKind, MemberSortKey } from '@text-them/shared';
 import { SortableHead } from '@/components/BroadcastListControls';
 import { CollapsibleToggle } from '@/components/CollapsibleToggle';
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/components/Loading';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
 import type { MemberSelection } from '@/components/TransferMembers';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -75,7 +76,7 @@ export function MemberListCard({
   id,
   title,
   groupId,
-  status,
+  list,
   defaultOpen,
   fallbackCount = 0,
   hideWhenEmpty = false,
@@ -89,7 +90,7 @@ export function MemberListCard({
   id: string;
   title: string;
   groupId: string;
-  status: SubscriptionStatus;
+  list: MemberListKind;
   defaultOpen: boolean;
   /** The count to show until the list loads. */
   fallbackCount?: number;
@@ -116,7 +117,7 @@ export function MemberListCard({
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [q, setQ] = useState('');
-  const { sort, dir, sortBy } = useMemberSort(status === 'subscribed' ? 'members' : 'left');
+  const { sort, dir, sortBy } = useMemberSort(list);
 
   useEffect(() => {
     const timer = setTimeout(() => setQ(filterText.trim()), FILTER_DELAY_MS);
@@ -124,7 +125,7 @@ export function MemberListCard({
   }, [filterText]);
 
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage, isPlaceholderData } =
-    useGroupMembers(groupId, status, q, sort, dir);
+    useGroupMembers(groupId, list, q, sort, dir);
   const firstPage = data?.pages[0];
   const total = firstPage?.total ?? fallbackCount;
   const matched = firstPage?.matched ?? 0;
@@ -344,10 +345,25 @@ export function MemberListCard({
                       </TableCell>
                     )}
                     <TableCell className="whitespace-nowrap tabular-nums">
-                      {formatPhoneNumber(m.phoneNumber)}
+                      <span className={cn(m.status === 'paused' && PAUSED_TEXT)}>
+                        {formatPhoneNumber(m.phoneNumber)}
+                      </span>
+                      {m.status === 'paused' && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-2 font-medium"
+                          title={pausedTitle(m)}
+                        >
+                          Paused
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="w-full py-1">
-                      <MemberNameInput memberId={m.memberId} name={m.name} />
+                      <MemberNameInput
+                        memberId={m.memberId}
+                        name={m.name}
+                        paused={m.status === 'paused'}
+                      />
                     </TableCell>
                     {dateColumns.map((c) => (
                       <TableCell key={c.label} className="text-muted-foreground">
@@ -376,13 +392,32 @@ function formatDate(iso: string | undefined): string {
   return iso ? new Date(iso).toLocaleDateString() : '—';
 }
 
+/** A paused member's number and name: crossed out and dimmed. */
+const PAUSED_TEXT = 'text-muted-foreground line-through';
+
+/** The Paused badge's tooltip: who paused them and when. */
+function pausedTitle(m: GroupMember): string {
+  const by = m.pausedByName ? ` by ${m.pausedByName}` : '';
+  const when = m.pausedAt ? ` on ${formatDate(m.pausedAt)}` : '';
+  return `Paused${by}${when}. They get no messages from this group until resumed.`;
+}
+
 /**
  * A member's name, edited in place: it looks like plain text until clicked, and
  * saves a couple of seconds after typing stops, or straight away on blur or
  * Enter. Escape puts back the saved name. Its row needs the `group` class, which
  * reveals the "Add a name" hint on hover.
  */
-function MemberNameInput({ memberId, name }: { memberId: string; name?: string }) {
+function MemberNameInput({
+  memberId,
+  name,
+  paused = false,
+}: {
+  memberId: string;
+  name?: string;
+  /** Crossed out, like the paused member's number. */
+  paused?: boolean;
+}) {
   const updateName = useUpdateMemberName();
   const saved = name ?? '';
   const [value, setValue] = useState(saved);
@@ -442,7 +477,10 @@ function MemberNameInput({ memberId, name }: { memberId: string; name?: string }
         placeholder="Add a name"
         aria-label="Member name"
         // The "Add a name" hint shows only while the row is hovered or the field is focused.
-        className="h-8 border-transparent px-2 shadow-none placeholder:text-transparent hover:border-input focus-visible:border-input focus-visible:placeholder:text-muted-foreground group-hover:placeholder:text-muted-foreground"
+        className={cn(
+          'h-8 border-transparent px-2 shadow-none placeholder:text-transparent hover:border-input focus-visible:border-input focus-visible:placeholder:text-muted-foreground group-hover:placeholder:text-muted-foreground',
+          paused && PAUSED_TEXT,
+        )}
         onFocus={() => {
           focused.current = true;
         }}

@@ -51,12 +51,15 @@ export interface SubscriptionDoc {
   status: SubscriptionStatus;
   /**
    * Where the latest change came from: `sms` for a keyword or STOP, `admin` when
-   * an organizer added or removed them (copy/move). An `admin` unsubscribe can be
-   * undone by an organizer; an `sms` one (they opted out) cannot.
+   * an organizer added, removed, paused or resumed them. An `admin` unsubscribe
+   * (moved out) can be undone by an organizer; an `sms` one (they opted out) cannot.
    */
   source: SubscriptionSource;
   subscribedAt?: Date;
   unsubscribedAt?: Date;
+  /** Set while paused: when, and by which organizer (Clerk user id). */
+  pausedAt?: Date;
+  pausedByUserId?: string;
 }
 
 export interface MessageDoc {

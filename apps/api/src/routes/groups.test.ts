@@ -256,11 +256,11 @@ describe('groups API', () => {
     const groupId = created.json().group.id;
     const text = (From: string, Body: string) =>
       app.inject({ method: 'POST', url: '/api/twilio/inbound', payload: { From, Body } });
-    const list = async (status: string) =>
+    const list = async (kind: string) =>
       (
         await app.inject({
           method: 'GET',
-          url: `/api/groups/${groupId}/members?status=${status}&sort=left`,
+          url: `/api/groups/${groupId}/members?list=${kind}&sort=left`,
         })
       ).json();
     const phones = (res: { members: { phoneNumber: string }[] }) =>
@@ -273,8 +273,8 @@ describe('groups API', () => {
     await new Promise((resolve) => setTimeout(resolve, 5)); // so the two STOPs get distinct times
     await text('+15550000003', 'STOP');
 
-    let members = await list('subscribed');
-    let left = await list('unsubscribed');
+    let members = await list('members');
+    let left = await list('left');
     expect(phones(members)).toEqual(['+15550000002']);
     expect(members.total).toBe(1);
     expect(left.members).toMatchObject([
@@ -287,8 +287,8 @@ describe('groups API', () => {
 
     // Texting the keyword again moves them back.
     await text('+15550000001', 'DRAGON');
-    members = await list('subscribed');
-    left = await list('unsubscribed');
+    members = await list('members');
+    left = await list('left');
     expect(phones(members).sort()).toEqual(['+15550000001', '+15550000002']);
     expect(phones(left)).toEqual(['+15550000003']);
   });

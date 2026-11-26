@@ -7,12 +7,15 @@ import type {
   ListGroupMembersResponse,
   GroupMember,
   MemberSortKey,
+  MemberStatusResponse,
   TransferMembersResponse,
 } from '@text-them/shared';
 import { badRequest, conflict, isDuplicateKeyError, notFound } from '../errors.js';
 import { escapeRegex } from '../regex.js';
 import { serializeGroup } from '../serializers.js';
 import { transferMembers } from '../services/transfers.js';
+import { setPaused } from '../services/pausing.js';
+import type { UserDirectory } from '../services/users.js';
 import {
   COLLECTIONS,
   type GroupDoc,
@@ -51,8 +54,18 @@ const transferMembersSchema = z
     path: ['memberIds'],
   });
 
+const memberStatusSchema = z
+  .object({
+    memberIds: z.array(objectIdSchema).min(1).max(5000).optional(),
+    all: z.literal(true).optional(),
+  })
+  .refine((v) => Boolean(v.memberIds) !== Boolean(v.all), {
+    message: 'Give either memberIds or all: true',
+    path: ['memberIds'],
+  });
+
 const listMembersSchema = z.object({
-  status: z.enum(['subscribed', 'unsubscribed']).default('subscribed'),
+  list: z.enum(['members', 'left']).default('members'),
   q: z.string().trim().max(100).default(''),
   sort: z.enum(['name', 'phone', 'subscribed', 'left']).default('name'),
   dir: z.enum(['asc', 'desc']).optional(),
@@ -95,25 +108,50 @@ function parseObjectId(value: string): ObjectId {
   return new ObjectId(value);
 }
 
-/** Returns a map of groupId -> count of currently subscribed members. */
-async function subscribedCounts(
+type MemberCounts = { subscribed: number; paused: number };
+const NO_MEMBERS: MemberCounts = { subscribed: 0, paused: 0 };
+
+/** Returns a map of groupId -> counts of subscribed and paused members. */
+async function memberCounts(
   fastify: FastifyInstance,
   groupIds: ObjectId[],
-): Promise<Map<string, number>> {
+): Promise<Map<string, MemberCounts>> {
   if (groupIds.length === 0) return new Map();
   const rows = await fastify.mongo.collections.subscriptions
     .aggregate<{
-      _id: ObjectId;
+      _id: { groupId: ObjectId; status: 'subscribed' | 'paused' };
       count: number;
     }>([
-      { $match: { groupId: { $in: groupIds }, status: 'subscribed' } },
-      { $group: { _id: '$groupId', count: { $sum: 1 } } },
+      { $match: { groupId: { $in: groupIds }, status: { $in: ['subscribed', 'paused'] } } },
+      { $group: { _id: { groupId: '$groupId', status: '$status' }, count: { $sum: 1 } } },
     ])
     .toArray();
-  return new Map(rows.map((r) => [r._id.toHexString(), r.count]));
+  const counts = new Map<string, MemberCounts>();
+  for (const r of rows) {
+    const key = r._id.groupId.toHexString();
+    const c = counts.get(key) ?? { ...NO_MEMBERS };
+    c[r._id.status] = r.count;
+    counts.set(key, c);
+  }
+  return counts;
 }
 
-export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
+/** Which subscriptions each member list shows. Moved-out members (an `admin` unsubscribe) are in neither. */
+function listFilter(groupId: ObjectId, list: 'members' | 'left'): Document {
+  return list === 'members'
+    ? { groupId, status: { $in: ['subscribed', 'paused'] } }
+    : { groupId, status: 'unsubscribed', source: { $ne: 'admin' } };
+}
+
+export interface GroupRoutesOptions {
+  /** Looks up the names of organizers who paused members. */
+  users: UserDirectory;
+}
+
+export async function groupRoutes(
+  fastify: FastifyInstance,
+  opts: GroupRoutesOptions,
+): Promise<void> {
   const { groups, subscriptions, messages } = fastify.mongo.collections;
 
   // All routes in this plugin require authentication.
@@ -121,11 +159,13 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.get('/api/groups', async (): Promise<ListGroupsResponse> => {
     const docs = await groups.find().sort({ createdAt: -1 }).toArray();
-    const counts = await subscribedCounts(
+    const counts = await memberCounts(
       fastify,
       docs.map((d) => d._id),
     );
-    return { groups: docs.map((d) => serializeGroup(d, counts.get(d._id.toHexString()) ?? 0)) };
+    return {
+      groups: docs.map((d) => serializeGroup(d, counts.get(d._id.toHexString()) ?? NO_MEMBERS)),
+    };
   });
 
   fastify.get<{ Params: { id: string } }>(
@@ -134,8 +174,8 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
       const id = parseObjectId(request.params.id);
       const doc = await groups.findOne({ _id: id });
       if (!doc) throw notFound('Group not found');
-      const counts = await subscribedCounts(fastify, [id]);
-      return { group: serializeGroup(doc, counts.get(id.toHexString()) ?? 0) };
+      const counts = await memberCounts(fastify, [id]);
+      return { group: serializeGroup(doc, counts.get(id.toHexString()) ?? NO_MEMBERS) };
     },
   );
 
@@ -160,7 +200,7 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     }
     fastify.events.notify('groups');
     reply.code(201);
-    return { group: serializeGroup(doc, 0) };
+    return { group: serializeGroup(doc, NO_MEMBERS) };
   });
 
   fastify.patch<{ Params: { id: string } }>(
@@ -178,8 +218,8 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
         );
         if (!updated) throw notFound('Group not found');
         fastify.events.notify('groups');
-        const counts = await subscribedCounts(fastify, [id]);
-        return { group: serializeGroup(updated, counts.get(id.toHexString()) ?? 0) };
+        const counts = await memberCounts(fastify, [id]);
+        return { group: serializeGroup(updated, counts.get(id.toHexString()) ?? NO_MEMBERS) };
       } catch (err) {
         if (isDuplicateKeyError(err))
           throw conflict(`Keyword "${input.keyword}" is already in use`);
@@ -220,19 +260,38 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     },
   );
 
+  // Pauses subscribed members (they stay listed but get no messages) or resumes paused ones.
+  for (const action of ['pause', 'resume'] as const) {
+    fastify.post<{ Params: { id: string } }>(
+      `/api/groups/:id/members/${action}`,
+      async (request): Promise<MemberStatusResponse> => {
+        const groupId = parseObjectId(request.params.id);
+        const input = memberStatusSchema.parse(request.body);
+        if (!(await groups.findOne({ _id: groupId }))) throw notFound('Group not found');
+        const changed = await setPaused(fastify.mongo.collections, action === 'pause', {
+          groupId,
+          members: input.all ? 'all' : input.memberIds!.map((id) => new ObjectId(id)),
+          userId: request.userId,
+        });
+        if (changed.length > 0) fastify.events.notify('groups');
+        return { memberIds: changed.map((id) => id.toHexString()) };
+      },
+    );
+  }
+
   // One page of a group's current members or of the people who left, optionally filtered.
   fastify.get<{ Params: { id: string } }>(
     '/api/groups/:id/members',
     async (request): Promise<ListGroupMembersResponse> => {
       const id = parseObjectId(request.params.id);
-      const { status, q, sort, dir, offset, limit } = listMembersSchema.parse(request.query);
+      const { list, q, sort, dir, offset, limit } = listMembersSchema.parse(request.query);
       const group = await groups.findOne({ _id: id });
       if (!group) throw notFound('Group not found');
 
       type Row = SubscriptionDoc & { member: MemberDoc };
       const [result] = await subscriptions
         .aggregate<{ page: Row[]; matched: { n: number }[] }>([
-          { $match: { groupId: id, status } },
+          { $match: listFilter(id, list) },
           {
             $lookup: {
               from: COLLECTIONS.members,
@@ -263,7 +322,9 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
           },
         ])
         .toArray();
-      const total = await subscriptions.countDocuments({ groupId: id, status });
+      const total = await subscriptions.countDocuments(listFilter(id, list));
+      const pausers = result.page.flatMap((s) => (s.pausedByUserId ? [s.pausedByUserId] : []));
+      const names = pausers.length > 0 ? await opts.users(pausers) : new Map<string, string>();
 
       return {
         members: result.page.map(
@@ -274,6 +335,9 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
             status: s.status,
             subscribedAt: s.subscribedAt?.toISOString(),
             unsubscribedAt: s.unsubscribedAt?.toISOString(),
+            pausedAt: s.pausedAt?.toISOString(),
+            pausedByUserId: s.pausedByUserId,
+            pausedByName: s.pausedByUserId ? names.get(s.pausedByUserId) : undefined,
           }),
         ),
         total,

@@ -12,6 +12,8 @@ import type {
   ListSendersResponse,
   MeResponse,
   MemberResponse,
+  MemberStatusRequest,
+  MemberStatusResponse,
   TransferMembersRequest,
   TransferMembersResponse,
   UpdateGroupRequest,
@@ -72,6 +74,12 @@ export function createApiClient(getToken: TokenGetter) {
     /** One page of a group's members, or of the people who left. */
     listGroupMembers: (id: string, query: ListGroupMembersQuery) =>
       request<ListGroupMembersResponse>(`/api/groups/${id}/members?${toParams(query)}`),
+    /** Pauses subscribed members or resumes paused ones. */
+    setMembersPaused: (id: string, action: 'pause' | 'resume', body: MemberStatusRequest) =>
+      request<MemberStatusResponse>(`/api/groups/${id}/members/${action}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     transferMembers: (id: string, body: TransferMembersRequest) =>
       request<TransferMembersResponse>(`/api/groups/${id}/members/transfer`, {
         method: 'POST',

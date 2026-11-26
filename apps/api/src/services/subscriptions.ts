@@ -64,9 +64,13 @@ export async function processInbound(
     const member = await collections.members.findOne({ phoneNumber: fromNumber });
     if (member) {
       await collections.subscriptions.updateMany(
-        { memberId: member._id, status: 'subscribed' },
+        // Paused members opt out too: their STOP outranks an organizer's pause.
+        { memberId: member._id, status: { $in: ['subscribed', 'paused'] } },
         // source 'sms' marks it as their own opt-out, which an organizer can't undo.
-        { $set: { status: 'unsubscribed', source: 'sms', unsubscribedAt: now } },
+        {
+          $set: { status: 'unsubscribed', source: 'sms', unsubscribedAt: now },
+          $unset: { pausedAt: '', pausedByUserId: '' },
+        },
       );
     }
     return { action: 'stop' };
@@ -92,8 +96,9 @@ export async function processInbound(
     await collections.subscriptions.updateOne(
       { memberId, groupId: group._id },
       {
+        // Texting the keyword is their own opt-in, so it also ends a pause.
         $set: { status: 'subscribed', source: 'sms', subscribedAt: now },
-        $unset: { unsubscribedAt: '' },
+        $unset: { unsubscribedAt: '', pausedAt: '', pausedByUserId: '' },
         $setOnInsert: { memberId, groupId: group._id },
       },
       { upsert: true },

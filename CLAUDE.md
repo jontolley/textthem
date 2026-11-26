@@ -89,9 +89,21 @@ stubs (see `src/routes/groups.test.ts`).
   - Changes are recorded with subscription `source: 'admin'`; a move unsubscribes
     them from the source that way. STOP sets `source: 'sms'`. Someone whose target
     subscription is an `sms` unsubscribe (they opted out) is never added back; an
-    `admin` one can be. Nobody is texted about it.
+    `admin` one can be. Paused members aren't transferred, and anyone paused in the
+    target is skipped. Nobody is texted about it.
   - The dashboard's group page has row checkboxes, "Select all N", and Copy to… /
     Move to… (`src/components/TransferMembers.tsx`), offering only same-org groups.
+- **Paused members.** Subscriptions have three statuses: `subscribed` (gets
+  messages), `paused` and `unsubscribed`. An organizer pauses or resumes members
+  with `POST /api/groups/:id/members/pause` / `/resume` (`src/services/pausing.ts`),
+  which records `pausedAt` and `pausedByUserId`. Paused members stay on the
+  Members list (crossed out, with a "Paused" badge naming who paused them) but get
+  no broadcasts.
+  - STOP from a paused member moves them to Left the group. Texting the keyword
+    again ends a pause.
+  - `GET /api/groups/:id/members?list=members` returns subscribed and paused;
+    `list=left` returns only STOP opt-outs (an `admin` unsubscribe, i.e. moved out,
+    appears in neither). Groups carry `memberCount` (subscribed) and `pausedCount`.
 - **Outbound sender is either/or.** `src/services/twilio.ts` uses a Messaging
   Service when `TWILIO_MESSAGING_SERVICE_SID` is set, otherwise `TWILIO_FROM_NUMBER`.
   Config validation requires at least one.

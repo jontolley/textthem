@@ -13,8 +13,9 @@ import type {
   ChangeTopic,
   CreateGroupRequest,
   ListMessagesQuery,
+  MemberListKind,
   MemberSortKey,
-  SubscriptionStatus,
+  MemberStatusRequest,
   TransferMembersRequest,
   UpdateGroupRequest,
   BroadcastRequest,
@@ -46,21 +47,22 @@ export function useGroup(id: string) {
 }
 
 /**
- * A group's current members (`subscribed`) or the people who left it
- * (`unsubscribed`), fetched a page at a time and optionally filtered by `q`.
+ * A group's current members, subscribed and paused (`members`), or the people
+ * who left it by texting STOP (`left`), fetched a page at a time and
+ * optionally filtered by `q`.
  */
 export function useGroupMembers(
   id: string,
-  status: SubscriptionStatus,
+  list: MemberListKind,
   q: string,
   sort: MemberSortKey,
   dir: 'asc' | 'desc',
 ) {
   const api = useApiClient();
   return useInfiniteQuery({
-    queryKey: ['groups', id, 'members', status, q, sort, dir],
+    queryKey: ['groups', id, 'members', list, q, sort, dir],
     queryFn: ({ pageParam }) =>
-      api.listGroupMembers(id, { status, q, sort, dir, offset: pageParam, limit: PAGE_SIZE }),
+      api.listGroupMembers(id, { list, q, sort, dir, offset: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, p) => n + p.members.length, 0);
@@ -198,6 +200,24 @@ export function useDeleteGroup() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteGroup(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
+  });
+}
+
+/** Pauses subscribed members of group `id`, or resumes paused ones. */
+export function useSetMembersPaused() {
+  const api = useApiClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      action,
+      body,
+    }: {
+      id: string;
+      action: 'pause' | 'resume';
+      body: MemberStatusRequest;
+    }) => api.setMembersPaused(id, action, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
   });
 }

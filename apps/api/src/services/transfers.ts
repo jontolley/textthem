@@ -20,6 +20,8 @@ export interface TransferMembersInput {
  *   `members` is ignored.
  * - Anyone who opted out of the target group (texted STOP, source `sms`) is
  *   never added back, and on a move stays in the source group.
+ * - Anyone paused in the target is left alone there, and on a move stays in
+ *   the source group.
  * - Anyone an organizer removed from the target earlier (source `admin`) can
  *   be added back.
  * - Changes made here are recorded with source `admin`; a move marks the
@@ -60,6 +62,7 @@ export async function transferMembers(
     added: 0,
     alreadyInGroup: 0,
     skippedOptedOut: 0,
+    skippedPaused: 0,
     removed: 0,
   };
   if (memberIds.length === 0) return result;
@@ -79,6 +82,9 @@ export async function transferMembers(
     if (existing?.status === 'subscribed') {
       result.alreadyInGroup++;
       toRemove.push(memberId);
+    } else if (existing?.status === 'paused') {
+      // Resuming them there is a separate decision; a move leaves them where they get texts.
+      result.skippedPaused++;
     } else if (existing && existing.source !== 'admin') {
       result.skippedOptedOut++;
     } else if (existing) {

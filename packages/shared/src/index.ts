@@ -5,7 +5,14 @@
  * ISO-8601 strings. The backend converts to/from ObjectId/Date at its edges.
  */
 
-export type SubscriptionStatus = 'subscribed' | 'unsubscribed';
+/**
+ * - subscribed: gets the group's messages.
+ * - paused: an organizer paused them; still listed as a member but gets no
+ *   messages until an organizer resumes them (or they text the keyword again).
+ * - unsubscribed: they texted STOP (source `sms`), or an organizer moved them
+ *   to another group (source `admin`).
+ */
+export type SubscriptionStatus = 'subscribed' | 'paused' | 'unsubscribed';
 
 /** How a subscription change originated. */
 export type SubscriptionSource = 'sms' | 'admin' | 'import';
@@ -22,8 +29,10 @@ export interface Group {
   keyword: string;
   description?: string;
   active: boolean;
-  /** Count of currently-subscribed members (populated on list/detail reads). */
+  /** Count of currently-subscribed members, who get messages (populated on list/detail reads). */
   memberCount?: number;
+  /** Count of members an organizer paused (populated on list/detail reads). */
+  pausedCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,8 +63,12 @@ export interface GroupMember {
   name?: string;
   status: SubscriptionStatus;
   subscribedAt?: string;
-  /** When they left (texted STOP, or an organizer moved them out); set only on unsubscribed members. */
+  /** When they left (texted STOP); set only on the Left the group list. */
   unsubscribedAt?: string;
+  /** Paused members only: when, and by which organizer (Clerk user id and name). */
+  pausedAt?: string;
+  pausedByUserId?: string;
+  pausedByName?: string;
 }
 
 /**
@@ -180,6 +193,21 @@ export interface BroadcastResponse {
 }
 
 /**
+ * Pauses or resumes members of a group (`POST /api/groups/:id/members/pause`
+ * or `/resume`). Give either `memberIds` or `all: true` (every member of the
+ * group). Pausing only affects subscribed members, resuming only paused ones.
+ */
+export interface MemberStatusRequest {
+  memberIds?: string[];
+  all?: boolean;
+}
+
+export interface MemberStatusResponse {
+  /** The members whose status changed, e.g. for an Undo. */
+  memberIds: string[];
+}
+
+/**
  * Copies or moves members to another group of the same organization
  * (`POST /api/groups/:id/members/transfer`, where `:id` is the source group).
  * Give either `memberIds` or `all: true` (every current member of the source).
@@ -203,6 +231,8 @@ export interface TransferMembersResponse {
    * On a move they stay in the source group.
    */
   skippedOptedOut: number;
+  /** Paused in the target group, so left alone there; on a move they stay in the source group. */
+  skippedPaused: number;
   /** Removed from the source group (moves only). */
   removed: number;
 }
@@ -217,11 +247,11 @@ export interface GroupResponse {
 
 /**
  * Query for one page of a group's members (`GET /api/groups/:id/members`).
- * `subscribed` lists current members, oldest first; `unsubscribed` lists people
- * who left (texted STOP), most recent first.
+ * `members` lists current members, subscribed and paused; `left` lists people
+ * who left by texting STOP (not those an organizer moved to another group).
  */
 export interface ListGroupMembersQuery {
-  status?: SubscriptionStatus;
+  list?: MemberListKind;
   /** Matches the name, or the phone number's digits (so formatting doesn't matter). */
   q?: string;
   /**
@@ -235,6 +265,8 @@ export interface ListGroupMembersQuery {
   offset?: number;
   limit?: number;
 }
+
+export type MemberListKind = 'members' | 'left';
 
 export type MemberSortKey = 'name' | 'phone' | 'subscribed' | 'left';
 
