@@ -11,8 +11,21 @@ import type {
  * the serialized wire types from @text-them/shared before responding.
  */
 
+/**
+ * An organization that owns groups. There is one today (created on boot from
+ * DEFAULT_ORG_SLUG); members can only be copied or moved within one org.
+ */
+export interface OrganizationDoc {
+  _id: ObjectId;
+  /** Unique. Matches the slug of the org's public pages in apps/web/src/config/org.ts. */
+  slug: string;
+  name: string;
+  createdAt: Date;
+}
+
 export interface GroupDoc {
   _id: ObjectId;
+  orgId: ObjectId;
   name: string;
   /** Uppercased, unique. */
   keyword: string;
@@ -36,6 +49,11 @@ export interface SubscriptionDoc {
   memberId: ObjectId;
   groupId: ObjectId;
   status: SubscriptionStatus;
+  /**
+   * Where the latest change came from: `sms` for a keyword or STOP, `admin` when
+   * an organizer added or removed them (copy/move). An `admin` unsubscribe can be
+   * undone by an organizer; an `sms` one (they opted out) cannot.
+   */
   source: SubscriptionSource;
   subscribedAt?: Date;
   unsubscribedAt?: Date;
@@ -98,6 +116,7 @@ export interface InboundMessageDoc {
 }
 
 export const COLLECTIONS = {
+  organizations: 'organizations',
   groups: 'groups',
   members: 'members',
   subscriptions: 'subscriptions',

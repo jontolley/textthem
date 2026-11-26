@@ -78,6 +78,20 @@ stubs (see `src/routes/groups.test.ts`).
   which means its Advanced Opt-Out already answered (e.g. HELP). The branded
   STOP/START/HELP texts live in Twilio → Messaging Service → Opt-out tab, which
   is Console-only (no API), not in this code. This is the most test-covered unit.
+- **Organizations and copy/move.** Every group has an `orgId` (`organizations`
+  collection). There is one org today: on boot `ensureDefaultOrg` (`src/db/index.ts`)
+  creates it from `DEFAULT_ORG_SLUG`/`ORG_NAME` if missing and gives it any group
+  without an org. New groups get `fastify.defaultOrgId`. Organizers, keywords and
+  inbound texts aren't per-org yet.
+  - `POST /api/groups/:id/members/transfer` (`src/services/transfers.ts`) copies or
+    moves members (`memberIds` or `all: true`) to another group, only within the
+    same org (400 otherwise). Only current members of the source go.
+  - Changes are recorded with subscription `source: 'admin'`; a move unsubscribes
+    them from the source that way. STOP sets `source: 'sms'`. Someone whose target
+    subscription is an `sms` unsubscribe (they opted out) is never added back; an
+    `admin` one can be. Nobody is texted about it.
+  - The dashboard's group page has row checkboxes, "Select all N", and Copy to… /
+    Move to… (`src/components/TransferMembers.tsx`), offering only same-org groups.
 - **Outbound sender is either/or.** `src/services/twilio.ts` uses a Messaging
   Service when `TWILIO_MESSAGING_SERVICE_SID` is set, otherwise `TWILIO_FROM_NUMBER`.
   Config validation requires at least one.
@@ -124,11 +138,11 @@ stubs (see `src/routes/groups.test.ts`).
     requests, since every open dashboard holds one.
 
 ### Data model
-Collections: `groups`, `members`, `subscriptions` (the opt-in audit trail with
+Collections: `organizations`, `groups` (each with an `orgId`), `members`, `subscriptions` (the opt-in audit trail with
 status + timestamps), `messages` (broadcasts, including scheduled ones: `status` is
 scheduled/sending/sent/canceled/missed/interrupted, absent = sent), `deliveries` (per-recipient
 Twilio status of each broadcast send), `inbound_messages` (every received SMS; the dashboard's Replies page lists them via `GET /api/inbound-messages`, with each sender's current groups). Indexes are created on boot in `src/db/index.ts` (`ensureIndexes`):
-unique on `groups.keyword`, `members.phoneNumber`, and `deliveries.twilioSid`, unique compound
+unique on `organizations.slug`, `groups.keyword`, `members.phoneNumber`, and `deliveries.twilioSid`, unique compound
 `{memberId, groupId}` on subscriptions. The database name is **`textthem`**
 (`MONGODB_DB_NAME`), the same in local and production.
 

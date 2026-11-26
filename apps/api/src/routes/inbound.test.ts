@@ -79,6 +79,7 @@ async function insertGroup(keyword: string): Promise<string> {
   const _id = new ObjectId();
   const now = new Date();
   await database.collections.groups.insertOne({
+    orgId: new ObjectId(),
     _id,
     name: keyword,
     keyword,

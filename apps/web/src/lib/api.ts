@@ -12,6 +12,8 @@ import type {
   ListSendersResponse,
   MeResponse,
   MemberResponse,
+  TransferMembersRequest,
+  TransferMembersResponse,
   UpdateGroupRequest,
   UpdateScheduledBroadcastRequest,
   UploadMediaResponse,
@@ -70,6 +72,11 @@ export function createApiClient(getToken: TokenGetter) {
     /** One page of a group's members, or of the people who left. */
     listGroupMembers: (id: string, query: ListGroupMembersQuery) =>
       request<ListGroupMembersResponse>(`/api/groups/${id}/members?${toParams(query)}`),
+    transferMembers: (id: string, body: TransferMembersRequest) =>
+      request<TransferMembersResponse>(`/api/groups/${id}/members/transfer`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     /** An empty name clears it. */
     updateMember: (id: string, name: string) =>
       request<MemberResponse>(`/api/members/${id}`, {

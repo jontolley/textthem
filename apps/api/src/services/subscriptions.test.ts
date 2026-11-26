@@ -15,6 +15,7 @@ async function seedGroup(overrides: Partial<GroupDoc> = {}): Promise<GroupDoc> {
   const now = new Date();
   const doc: GroupDoc = {
     _id: new ObjectId(),
+    orgId: new ObjectId(),
     name: 'Dragons',
     keyword: 'DRAGON',
     active: true,

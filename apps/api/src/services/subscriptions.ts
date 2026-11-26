@@ -65,7 +65,8 @@ export async function processInbound(
     if (member) {
       await collections.subscriptions.updateMany(
         { memberId: member._id, status: 'subscribed' },
-        { $set: { status: 'unsubscribed', unsubscribedAt: now } },
+        // source 'sms' marks it as their own opt-out, which an organizer can't undo.
+        { $set: { status: 'unsubscribed', source: 'sms', unsubscribedAt: now } },
       );
     }
     return { action: 'stop' };

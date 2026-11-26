@@ -87,6 +87,7 @@ async function seedGroup(phones: string[]): Promise<ObjectId> {
   const now = new Date();
   const groupId = new ObjectId();
   await database.collections.groups.insertOne({
+    orgId: new ObjectId(),
     _id: groupId,
     name: 'Dragons',
     keyword: 'DRAGON',
@@ -217,6 +218,7 @@ describe('scheduled broadcasts', () => {
     const addGroup = async (name: string, keyword: string) => {
       const _id = new ObjectId();
       await database.collections.groups.insertOne({
+        orgId: new ObjectId(),
         _id,
         name,
         keyword,

@@ -1,7 +1,8 @@
-import { MongoClient, type Collection, type Db } from 'mongodb';
+import { MongoClient, type Collection, type Db, type ObjectId } from 'mongodb';
 import fp from 'fastify-plugin';
 import {
   COLLECTIONS,
+  type OrganizationDoc,
   type GroupDoc,
   type MemberDoc,
   type SubscriptionDoc,
@@ -11,6 +12,7 @@ import {
 } from './documents.js';
 
 export interface Collections {
+  organizations: Collection<OrganizationDoc>;
   groups: Collection<GroupDoc>;
   members: Collection<MemberDoc>;
   subscriptions: Collection<SubscriptionDoc>;
@@ -27,6 +29,7 @@ export interface Database {
 
 function getCollections(db: Db): Collections {
   return {
+    organizations: db.collection<OrganizationDoc>(COLLECTIONS.organizations),
     groups: db.collection<GroupDoc>(COLLECTIONS.groups),
     members: db.collection<MemberDoc>(COLLECTIONS.members),
     subscriptions: db.collection<SubscriptionDoc>(COLLECTIONS.subscriptions),
@@ -38,7 +41,9 @@ function getCollections(db: Db): Collections {
 
 /** Creates the indexes the app relies on. Safe to run repeatedly. */
 export async function ensureIndexes(collections: Collections): Promise<void> {
+  await collections.organizations.createIndex({ slug: 1 }, { unique: true });
   await collections.groups.createIndex({ keyword: 1 }, { unique: true });
+  await collections.groups.createIndex({ orgId: 1 });
   await collections.members.createIndex({ phoneNumber: 1 }, { unique: true });
   await collections.subscriptions.createIndex(
     { memberId: 1, groupId: 1 },
@@ -50,6 +55,24 @@ export async function ensureIndexes(collections: Collections): Promise<void> {
   await collections.deliveries.createIndex({ twilioSid: 1 }, { unique: true });
   await collections.deliveries.createIndex({ broadcastId: 1 });
   await collections.inboundMessages.createIndex({ receivedAt: -1 });
+}
+
+/**
+ * Finds or creates the default organization and gives it every group that has
+ * no org yet (groups from before orgs existed). Safe to run repeatedly.
+ */
+export async function ensureDefaultOrg(
+  collections: Collections,
+  org: { slug: string; name: string },
+): Promise<ObjectId> {
+  const doc = await collections.organizations.findOneAndUpdate(
+    { slug: org.slug },
+    { $setOnInsert: { slug: org.slug, name: org.name, createdAt: new Date() } },
+    { upsert: true, returnDocument: 'after' },
+  );
+  const orgId = doc!._id;
+  await collections.groups.updateMany({ orgId: { $exists: false } }, { $set: { orgId } });
+  return orgId;
 }
 
 export async function connectDatabase(uri: string, dbName: string): Promise<Database> {
@@ -66,6 +89,8 @@ export async function connectDatabase(uri: string, dbName: string): Promise<Data
 declare module 'fastify' {
   interface FastifyInstance {
     mongo: Database;
+    /** The org new groups belong to (see `ensureDefaultOrg`). */
+    defaultOrgId: ObjectId;
   }
 }
 

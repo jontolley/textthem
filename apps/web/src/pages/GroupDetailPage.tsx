@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { LoadingLabel, Skeleton, SkeletonTableRows } from '@/components/Loading';
 import { MemberListCard } from '@/components/MemberList';
+import {
+  NO_SELECTION,
+  SelectionBar,
+  TransferMembersDialog,
+  type MemberSelection,
+  type TransferMode,
+} from '@/components/TransferMembers';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -18,6 +25,11 @@ export function GroupDetailPage() {
   const { data: group, isLoading } = useGroup(id);
   const deleteGroup = useDeleteGroup();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [selection, setSelection] = useState<MemberSelection>(NO_SELECTION);
+  const [transferMode, setTransferMode] = useState<TransferMode | null>(null);
+
+  // A different group starts with nothing checked.
+  useEffect(() => setSelection(NO_SELECTION), [id]);
 
   async function handleDelete() {
     try {
@@ -33,6 +45,7 @@ export function GroupDetailPage() {
   if (!group) return <p className="text-sm text-destructive">Group not found.</p>;
 
   const memberCount = group.memberCount ?? 0;
+  const selectedCount = selection.all ? memberCount : selection.ids.size;
 
   return (
     <div className="space-y-6">
@@ -96,6 +109,27 @@ export function GroupDetailPage() {
           </p>
         }
         dateColumns={[{ label: 'Subscribed', sort: 'subscribed', value: (m) => m.subscribedAt }]}
+        selection={selection}
+        onSelectionChange={setSelection}
+        toolbar={
+          selectedCount > 0 && (
+            <SelectionBar
+              count={selectedCount}
+              onCopy={() => setTransferMode('copy')}
+              onMove={() => setTransferMode('move')}
+              onClear={() => setSelection(NO_SELECTION)}
+            />
+          )
+        }
+      />
+
+      <TransferMembersDialog
+        mode={transferMode}
+        onOpenChange={(open) => !open && setTransferMode(null)}
+        source={group}
+        selection={selection}
+        count={selectedCount}
+        onDone={() => setSelection(NO_SELECTION)}
       />
 
       {/* Shown once someone has left. Collapsed by default: it's looked at now and then. */}
@@ -108,8 +142,9 @@ export function GroupDetailPage() {
         hideWhenEmpty
         intro={
           <p className="text-sm text-muted-foreground">
-            People who texted STOP. STOP takes them out of every group and they get no more texts.
-            To rejoin, they text START and then the group&rsquo;s keyword.
+            People who texted STOP, or who were moved to another group. STOP takes them out of
+            every group and they get no more texts. To rejoin, they text START and then the
+            group&rsquo;s keyword.
           </p>
         }
         dateColumns={[

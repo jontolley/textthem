@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import formbody from '@fastify/formbody';
 import { clerkPlugin } from '@clerk/fastify';
 import { ZodError } from 'zod';
-import { databasePlugin, type Database } from './db/index.js';
+import { databasePlugin, ensureDefaultOrg, type Database } from './db/index.js';
 import { authPlugin, clerkAuthenticator, type Authenticator } from './plugins/auth.js';
 import { groupRoutes } from './routes/groups.js';
 import { memberRoutes } from './routes/members.js';
@@ -95,6 +95,13 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     opts.database
       ? { database: opts.database }
       : { uri: config.MONGODB_URI, dbName: config.MONGODB_DB_NAME },
+  );
+  app.decorate(
+    'defaultOrgId',
+    await ensureDefaultOrg(app.mongo.collections, {
+      slug: config.DEFAULT_ORG_SLUG,
+      name: config.ORG_NAME,
+    }),
   );
 
   // Routes and the scheduler announce changes here; open dashboards hear them.

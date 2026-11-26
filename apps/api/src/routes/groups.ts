@@ -7,10 +7,12 @@ import type {
   ListGroupMembersResponse,
   GroupMember,
   MemberSortKey,
+  TransferMembersResponse,
 } from '@text-them/shared';
 import { badRequest, conflict, isDuplicateKeyError, notFound } from '../errors.js';
 import { escapeRegex } from '../regex.js';
 import { serializeGroup } from '../serializers.js';
+import { transferMembers } from '../services/transfers.js';
 import {
   COLLECTIONS,
   type GroupDoc,
@@ -34,6 +36,20 @@ const createGroupSchema = z.object({
 });
 
 const updateGroupSchema = createGroupSchema.partial();
+
+const objectIdSchema = z.string().refine((v) => ObjectId.isValid(v), 'Invalid id');
+
+const transferMembersSchema = z
+  .object({
+    targetGroupId: objectIdSchema,
+    mode: z.enum(['copy', 'move']),
+    memberIds: z.array(objectIdSchema).min(1).max(5000).optional(),
+    all: z.literal(true).optional(),
+  })
+  .refine((v) => Boolean(v.memberIds) !== Boolean(v.all), {
+    message: 'Give either memberIds or all: true',
+    path: ['memberIds'],
+  });
 
 const listMembersSchema = z.object({
   status: z.enum(['subscribed', 'unsubscribed']).default('subscribed'),
@@ -128,6 +144,7 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     const now = new Date();
     const doc: GroupDoc = {
       _id: new ObjectId(),
+      orgId: fastify.defaultOrgId,
       name: input.name,
       keyword: input.keyword,
       description: input.description,
@@ -185,6 +202,23 @@ export async function groupRoutes(fastify: FastifyInstance): Promise<void> {
     fastify.events.notify('messages');
     reply.code(204);
   });
+
+  // Copies or moves members to another group of the same org (see services/transfers.ts).
+  fastify.post<{ Params: { id: string } }>(
+    '/api/groups/:id/members/transfer',
+    async (request): Promise<TransferMembersResponse> => {
+      const sourceGroupId = parseObjectId(request.params.id);
+      const input = transferMembersSchema.parse(request.body);
+      const result = await transferMembers(fastify.mongo.collections, {
+        sourceGroupId,
+        targetGroupId: new ObjectId(input.targetGroupId),
+        mode: input.mode,
+        members: input.all ? 'all' : input.memberIds!.map((id) => new ObjectId(id)),
+      });
+      if (result.added > 0 || result.removed > 0) fastify.events.notify('groups');
+      return result;
+    },
+  );
 
   // One page of a group's current members or of the people who left, optionally filtered.
   fastify.get<{ Params: { id: string } }>(

@@ -34,6 +34,12 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   ORG_NAME: z.string().default('Our Organization'),
+  // Slug of the organization groups belong to, created on boot if missing (named
+  // ORG_NAME). Matches the org's public pages in apps/web/src/config/org.ts.
+  DEFAULT_ORG_SLUG: z
+    .string()
+    .regex(/^[a-z0-9-]+$/, 'Lowercase letters, digits and hyphens only')
+    .default('opportunity-eq'),
   // Contact address included in HELP replies (carriers require contact info).
   SUPPORT_EMAIL: z.string().email().default('info@textthem.app'),
 

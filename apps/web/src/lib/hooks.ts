@@ -15,6 +15,7 @@ import type {
   ListMessagesQuery,
   MemberSortKey,
   SubscriptionStatus,
+  TransferMembersRequest,
   UpdateGroupRequest,
   BroadcastRequest,
   UpdateScheduledBroadcastRequest,
@@ -197,6 +198,17 @@ export function useDeleteGroup() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteGroup(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
+  });
+}
+
+/** Copies or moves members from group `id` to another group of the same org. */
+export function useTransferMembers() {
+  const api = useApiClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: TransferMembersRequest }) =>
+      api.transferMembers(id, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
   });
 }

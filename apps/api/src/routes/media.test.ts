@@ -104,6 +104,7 @@ async function seedGroup(phone = '+15550000001'): Promise<string> {
   const groupId = new ObjectId();
   const memberId = new ObjectId();
   await database.collections.groups.insertOne({
+    orgId: new ObjectId(),
     _id: groupId,
     name: 'Dragons',
     keyword: 'DRAGON',

@@ -84,6 +84,7 @@ async function broadcastTo(phones: string[]): Promise<BroadcastMessage> {
   const now = new Date();
   const groupId = new ObjectId();
   await collections.groups.insertOne({
+    orgId: new ObjectId(),
     _id: groupId,
     name: 'Dragons',
     keyword: 'DRAGON',

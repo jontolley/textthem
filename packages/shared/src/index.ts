@@ -15,6 +15,8 @@ export type InboundAction = 'join' | 'stop' | 'start' | 'help' | 'unknown';
 
 export interface Group {
   id: string;
+  /** The organization that owns it. Members can only be copied or moved between groups of one org. */
+  orgId: string;
   name: string;
   /** Uppercased, unique opt-in keyword (e.g. "DRAGON"). */
   keyword: string;
@@ -52,7 +54,7 @@ export interface GroupMember {
   name?: string;
   status: SubscriptionStatus;
   subscribedAt?: string;
-  /** When they left (texted STOP); set only on unsubscribed members. */
+  /** When they left (texted STOP, or an organizer moved them out); set only on unsubscribed members. */
   unsubscribedAt?: string;
 }
 
@@ -175,6 +177,34 @@ export interface UpdateScheduledBroadcastRequest {
 
 export interface BroadcastResponse {
   message: BroadcastMessage;
+}
+
+/**
+ * Copies or moves members to another group of the same organization
+ * (`POST /api/groups/:id/members/transfer`, where `:id` is the source group).
+ * Give either `memberIds` or `all: true` (every current member of the source).
+ * Only current members of the source are transferred.
+ */
+export interface TransferMembersRequest {
+  targetGroupId: string;
+  /** `move` also removes them from the source group. */
+  mode: 'copy' | 'move';
+  memberIds?: string[];
+  all?: boolean;
+}
+
+export interface TransferMembersResponse {
+  /** Newly added to the target group. */
+  added: number;
+  /** Were already in the target group (on a move, still removed from the source). */
+  alreadyInGroup: number;
+  /**
+   * Left the target group themselves (texted STOP), so they weren't added back.
+   * On a move they stay in the source group.
+   */
+  skippedOptedOut: number;
+  /** Removed from the source group (moves only). */
+  removed: number;
 }
 
 export interface ListGroupsResponse {

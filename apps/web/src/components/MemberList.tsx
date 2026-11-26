@@ -13,6 +13,7 @@ import {
   reloadingClass,
 } from '@/components/Loading';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
+import type { MemberSelection } from '@/components/TransferMembers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -81,6 +82,9 @@ export function MemberListCard({
   intro,
   empty,
   dateColumns,
+  selection,
+  onSelectionChange,
+  toolbar,
 }: {
   id: string;
   title: string;
@@ -99,6 +103,14 @@ export function MemberListCard({
     sort: MemberSortKey;
     value: (m: GroupMember) => string | undefined;
   }[];
+  /** Adds a checkbox to each row when given, with `onSelectionChange`. */
+  selection?: MemberSelection;
+  onSelectionChange?: (selection: MemberSelection) => void;
+  /**
+   * Shown in the header line, before the filter button (e.g. actions for the
+   * checked members). In the header so the rows don't shift when it appears.
+   */
+  toolbar?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -140,7 +152,31 @@ export function MemberListCard({
 
   if (hideWhenEmpty && total === 0) return null;
 
-  const columnCount = 2 + dateColumns.length;
+  const selectable = Boolean(selection && onSelectionChange);
+  const columnCount = 2 + dateColumns.length + (selectable ? 1 : 0);
+  const isSelected = (m: GroupMember) =>
+    selection ? selection.all || selection.ids.has(m.memberId) : false;
+  const allRowsSelected = rows.length > 0 && rows.every(isSelected);
+
+  function toggleRow(m: GroupMember) {
+    if (!selection || !onSelectionChange) return;
+    // Unchecking one while "everyone" is selected keeps the rest of what's loaded.
+    const ids = new Set(selection.all ? rows.map((r) => r.memberId) : selection.ids);
+    if (ids.has(m.memberId)) ids.delete(m.memberId);
+    else ids.add(m.memberId);
+    onSelectionChange({ all: false, ids });
+  }
+
+  function toggleAllRows() {
+    if (!selection || !onSelectionChange) return;
+    if (allRowsSelected) {
+      onSelectionChange({ all: false, ids: new Set() });
+    } else {
+      const ids = new Set(selection.all ? [] : selection.ids);
+      rows.forEach((r) => ids.add(r.memberId));
+      onSelectionChange({ all: false, ids });
+    }
+  }
 
   return (
     <Card className={LOADING_CARD}>
@@ -157,6 +193,7 @@ export function MemberListCard({
               onToggle={() => setOpen((v) => !v)}
             />
           </div>
+          {total > 0 && toolbar}
           {total > 0 && (
             <Button
               type="button"
@@ -213,6 +250,34 @@ export function MemberListCard({
               </Table>
             </>
           )}
+          {/* Only some rows are loaded, so offer everyone (not with a filter, which the API doesn't apply). */}
+          {selectable && !q && total > rows.length && (selection!.all || allRowsSelected) && (
+            <p className="text-sm text-muted-foreground">
+              {selection!.all ? (
+                <>
+                  All {total} members are selected.{' '}
+                  <button
+                    type="button"
+                    className="text-link underline-offset-4 hover:underline"
+                    onClick={() => onSelectionChange!({ all: false, ids: new Set() })}
+                  >
+                    Clear selection
+                  </button>
+                </>
+              ) : (
+                <>
+                  The {rows.length} members shown are selected.{' '}
+                  <button
+                    type="button"
+                    className="text-link underline-offset-4 hover:underline"
+                    onClick={() => onSelectionChange!({ all: true })}
+                  >
+                    Select all {total}
+                  </button>
+                </>
+              )}
+            </p>
+          )}
           {total > 0 && q && firstPage && matched === 0 && (
             <p className="text-sm text-muted-foreground">No one matches &ldquo;{q}&rdquo;.</p>
           )}
@@ -224,6 +289,17 @@ export function MemberListCard({
             >
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
+                  {selectable && (
+                    <th className={cn(STICKY_HEAD, 'w-8 px-2')}>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 align-middle accent-primary"
+                        checked={allRowsSelected}
+                        onChange={toggleAllRows}
+                        aria-label={allRowsSelected ? 'Unselect all' : 'Select all shown'}
+                      />
+                    </th>
+                  )}
                   <SortableHead
                     label="Phone number"
                     active={sort === 'phone'}
@@ -252,7 +328,21 @@ export function MemberListCard({
               </TableHeader>
               <TableBody>
                 {rows.map((m) => (
-                  <TableRow key={m.memberId} className="group">
+                  <TableRow
+                    key={m.memberId}
+                    className={cn('group', isSelected(m) && 'bg-muted/50')}
+                  >
+                    {selectable && (
+                      <TableCell className="w-8 px-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 align-middle accent-primary"
+                          checked={isSelected(m)}
+                          onChange={() => toggleRow(m)}
+                          aria-label={`Select ${m.name || formatPhoneNumber(m.phoneNumber)}`}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="whitespace-nowrap tabular-nums">
                       {formatPhoneNumber(m.phoneNumber)}
                     </TableCell>

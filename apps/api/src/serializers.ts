@@ -16,6 +16,7 @@ import {
 export function serializeGroup(doc: GroupDoc, memberCount?: number): Group {
   return {
     id: doc._id.toHexString(),
+    orgId: doc.orgId.toHexString(),
     name: doc.name,
     keyword: doc.keyword,
     description: doc.description,
