@@ -51,7 +51,7 @@ export function GroupDetailPage() {
       const { memberIds } = await setPaused.mutateAsync({
         id,
         action,
-        body: selection.all ? { all: true } : { memberIds: [...selection.ids] },
+        body: selection.all ? { all: true } : { memberIds: [...selection.ids.keys()] },
       });
       setSelection(NO_SELECTION);
       const n = memberIds.length;
@@ -87,6 +87,9 @@ export function GroupDetailPage() {
   const memberCount = group.memberCount ?? 0;
   const pausedCount = group.pausedCount ?? 0;
   const selectedCount = selection.all ? memberCount + pausedCount : selection.ids.size;
+  const selectedStatuses = selection.all ? [] : [...selection.ids.values()];
+  const canPause = selection.all ? memberCount > 0 : selectedStatuses.includes('subscribed');
+  const canResume = selection.all ? pausedCount > 0 : selectedStatuses.includes('paused');
 
   return (
     <div className="space-y-6">
@@ -156,6 +159,8 @@ export function GroupDetailPage() {
           selectedCount > 0 && (
             <SelectionBar
               count={selectedCount}
+              canPause={canPause}
+              canResume={canResume}
               onPause={() => handlePaused('pause')}
               onResume={() => handlePaused('resume')}
               busy={setPaused.isPending}

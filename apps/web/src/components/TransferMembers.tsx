@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Copy, MoveRight, Pause, Play, X } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Group, TransferMembersResponse } from '@text-them/shared';
+import type { Group, SubscriptionStatus, TransferMembersResponse } from '@text-them/shared';
 import { Select } from '@/components/BroadcastListControls';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,10 +16,15 @@ import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api';
 import { useGroups, useTransferMembers } from '@/lib/hooks';
 
-/** Which members of a group's list are checked: some by id, or every current member. */
-export type MemberSelection = { all: true } | { all: false; ids: Set<string> };
+/**
+ * Which members of a group's list are checked: some by id (with their status
+ * when checked, to decide which actions apply), or every current member.
+ */
+export type MemberSelection =
+  | { all: true }
+  | { all: false; ids: ReadonlyMap<string, SubscriptionStatus> };
 
-export const NO_SELECTION: MemberSelection = { all: false, ids: new Set() };
+export const NO_SELECTION: MemberSelection = { all: false, ids: new Map() };
 
 export type TransferMode = 'copy' | 'move';
 
@@ -30,6 +35,8 @@ function plural(n: number, one: string, many = `${one}s`): string {
 /** Shown in the member list's header while members are checked. */
 export function SelectionBar({
   count,
+  canPause,
+  canResume,
   onPause,
   onResume,
   onCopy,
@@ -38,6 +45,10 @@ export function SelectionBar({
   busy,
 }: {
   count: number;
+  /** Some of the checked members are subscribed; otherwise Pause is hidden. */
+  canPause: boolean;
+  /** Some of the checked members are paused; otherwise Resume is hidden. */
+  canResume: boolean;
   onPause: () => void;
   onResume: () => void;
   onCopy: () => void;
@@ -51,12 +62,16 @@ export function SelectionBar({
       <span className="text-muted-foreground" aria-live="polite">
         {count} selected
       </span>
-      <Button size="sm" variant="outline" className="h-8" onClick={onPause} disabled={busy}>
-        <Pause className="h-4 w-4" /> Pause
-      </Button>
-      <Button size="sm" variant="outline" className="h-8" onClick={onResume} disabled={busy}>
-        <Play className="h-4 w-4" /> Resume
-      </Button>
+      {canPause && (
+        <Button size="sm" variant="outline" className="h-8" onClick={onPause} disabled={busy}>
+          <Pause className="h-4 w-4" /> Pause
+        </Button>
+      )}
+      {canResume && (
+        <Button size="sm" variant="outline" className="h-8" onClick={onResume} disabled={busy}>
+          <Play className="h-4 w-4" /> Resume
+        </Button>
+      )}
       <Button size="sm" variant="outline" className="h-8" onClick={onCopy}>
         <Copy className="h-4 w-4" /> Copy to…
       </Button>
@@ -138,7 +153,7 @@ export function TransferMembersDialog({
         body: {
           targetGroupId: target.id,
           mode,
-          ...(selection.all ? { all: true } : { memberIds: [...selection.ids] }),
+          ...(selection.all ? { all: true } : { memberIds: [...selection.ids.keys()] }),
         },
       });
       toast.success(summarize(mode, target.name, result));

@@ -13,8 +13,7 @@ import {
   reloadingClass,
 } from '@/components/Loading';
 import { LoadMoreRow, STICKY_HEAD, useScrollingList } from '@/components/ScrollingList';
-import type { MemberSelection } from '@/components/TransferMembers';
-import { Badge } from '@/components/ui/badge';
+import { NO_SELECTION, type MemberSelection } from '@/components/TransferMembers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -162,19 +161,21 @@ export function MemberListCard({
   function toggleRow(m: GroupMember) {
     if (!selection || !onSelectionChange) return;
     // Unchecking one while "everyone" is selected keeps the rest of what's loaded.
-    const ids = new Set(selection.all ? rows.map((r) => r.memberId) : selection.ids);
+    const ids = new Map(
+      selection.all ? rows.map((r) => [r.memberId, r.status] as const) : selection.ids,
+    );
     if (ids.has(m.memberId)) ids.delete(m.memberId);
-    else ids.add(m.memberId);
+    else ids.set(m.memberId, m.status);
     onSelectionChange({ all: false, ids });
   }
 
   function toggleAllRows() {
     if (!selection || !onSelectionChange) return;
     if (allRowsSelected) {
-      onSelectionChange({ all: false, ids: new Set() });
+      onSelectionChange(NO_SELECTION);
     } else {
-      const ids = new Set(selection.all ? [] : selection.ids);
-      rows.forEach((r) => ids.add(r.memberId));
+      const ids = new Map(selection.all ? [] : selection.ids);
+      rows.forEach((r) => ids.set(r.memberId, r.status));
       onSelectionChange({ all: false, ids });
     }
   }
@@ -260,7 +261,7 @@ export function MemberListCard({
                   <button
                     type="button"
                     className="text-link underline-offset-4 hover:underline"
-                    onClick={() => onSelectionChange!({ all: false, ids: new Set() })}
+                    onClick={() => onSelectionChange!(NO_SELECTION)}
                   >
                     Clear selection
                   </button>
@@ -345,17 +346,14 @@ export function MemberListCard({
                       </TableCell>
                     )}
                     <TableCell className="whitespace-nowrap tabular-nums">
-                      <span className={cn(m.status === 'paused' && PAUSED_TEXT)}>
-                        {formatPhoneNumber(m.phoneNumber)}
-                      </span>
-                      {m.status === 'paused' && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-2 font-medium"
-                          title={pausedTitle(m)}
-                        >
-                          Paused
-                        </Badge>
+                      {m.status === 'paused' ? (
+                        // Hovering says who paused them; screen readers hear "paused" too.
+                        <span className={PAUSED_TEXT} title={pausedTitle(m)}>
+                          {formatPhoneNumber(m.phoneNumber)}
+                          <span className="sr-only"> (paused)</span>
+                        </span>
+                      ) : (
+                        formatPhoneNumber(m.phoneNumber)
                       )}
                     </TableCell>
                     <TableCell className="w-full py-1">
@@ -395,7 +393,7 @@ function formatDate(iso: string | undefined): string {
 /** A paused member's number and name: crossed out and dimmed. */
 const PAUSED_TEXT = 'text-muted-foreground line-through';
 
-/** The Paused badge's tooltip: who paused them and when. */
+/** A paused member's number's tooltip: who paused them and when. */
 function pausedTitle(m: GroupMember): string {
   const by = m.pausedByName ? ` by ${m.pausedByName}` : '';
   const when = m.pausedAt ? ` on ${formatDate(m.pausedAt)}` : '';
